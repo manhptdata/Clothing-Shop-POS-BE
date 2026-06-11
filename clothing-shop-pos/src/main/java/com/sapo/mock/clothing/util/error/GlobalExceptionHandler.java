@@ -94,18 +94,6 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Xử lý lỗi lưu trữ file.
-     */
-    @ExceptionHandler(StorageException.class)
-    public ResponseEntity<RestResponse<Object>> handleStorageException(StorageException exception) {
-        RestResponse<Object> response = new RestResponse<>();
-        response.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR.value());
-        response.setError("Lỗi xử lý file");
-        response.setMessage(exception.getMessage());
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-    }
-
-    /**
      * Xử lý các lỗi runtime không mong đợi còn lại.
      */
     @ExceptionHandler(Exception.class)
