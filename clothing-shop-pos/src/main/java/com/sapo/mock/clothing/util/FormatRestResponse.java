@@ -35,8 +35,13 @@ public class FormatRestResponse implements ResponseBodyAdvice<Object> {
             ((ServletServerHttpResponse) response).getServletResponse();
         int statusCode = servletResponse.getStatus();
 
-        // Không bọc nếu body đã là RestResponse (tránh double wrap)
-        if (body instanceof RestResponse) {
+        String path = request.getURI().getPath();
+        if (path.startsWith("/v3/api-docs") || path.startsWith("/swagger-ui")) {
+            return body;
+        }
+
+        // Không bọc nếu body đã là RestResponse (tránh double wrap) hoặc String
+        if (body instanceof RestResponse || body instanceof String) {
             return body;
         }
 
