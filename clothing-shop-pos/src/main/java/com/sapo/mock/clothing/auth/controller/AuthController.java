@@ -1,6 +1,6 @@
 package com.sapo.mock.clothing.auth.controller;
 
-import com.sapo.mock.clothing.user.entity.User;
+import com.sapo.mock.clothing.entity.User;
 import com.sapo.mock.clothing.auth.dto.request.ReqLoginDTO;
 import com.sapo.mock.clothing.auth.dto.response.ResLoginDTO;
 import com.sapo.mock.clothing.user.service.UserService;

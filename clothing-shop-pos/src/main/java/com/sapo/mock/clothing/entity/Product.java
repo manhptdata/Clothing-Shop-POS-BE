@@ -1,6 +1,5 @@
-package com.sapo.mock.clothing.product.entity;
+package com.sapo.mock.clothing.entity;
 
-import com.sapo.mock.clothing.user.entity.User;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -53,7 +52,6 @@ public class Product {
     @Column(name = "is_deleted", nullable = false)
     private boolean deleted = false;
 
-    // JSON column — lưu dạng chuỗi, team có thể parse thủ công hoặc dùng converter
     @Column(columnDefinition = "JSON")
     private String attributes;
 

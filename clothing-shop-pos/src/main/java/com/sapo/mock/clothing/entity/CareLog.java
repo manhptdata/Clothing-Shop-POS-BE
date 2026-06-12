@@ -1,8 +1,5 @@
-package com.sapo.mock.clothing.crm.entity;
+package com.sapo.mock.clothing.entity;
 
-import com.sapo.mock.clothing.customer.entity.Customer;
-import com.sapo.mock.clothing.pos.entity.Invoice;
-import com.sapo.mock.clothing.user.entity.User;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

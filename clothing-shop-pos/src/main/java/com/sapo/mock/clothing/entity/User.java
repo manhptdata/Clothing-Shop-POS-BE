@@ -1,4 +1,4 @@
-package com.sapo.mock.clothing.user.entity;
+package com.sapo.mock.clothing.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.sapo.mock.clothing.util.constant.RoleEnum;
@@ -60,4 +60,3 @@ public class User {
         }
     }
 }
-

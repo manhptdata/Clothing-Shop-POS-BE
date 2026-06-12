@@ -1,6 +1,5 @@
-package com.sapo.mock.clothing.crm.entity;
+package com.sapo.mock.clothing.entity;
 
-import com.sapo.mock.clothing.product.entity.Product;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -27,7 +26,6 @@ public class ReturnReceiptItem {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
-    // Snapshot tại thời điểm trả hàng
     @Column(name = "product_name", nullable = false, length = 255)
     private String productName;
 
@@ -40,7 +38,7 @@ public class ReturnReceiptItem {
     @Column(name = "unit_price", nullable = false, precision = 15, scale = 2)
     private BigDecimal unitPrice;
 
-    // subtotal = quantity * unit_price — tính trong DB (STORED), ánh xạ read-only
+    // STORED computed column — chỉ đọc, không ghi từ Java
     @Column(nullable = false, precision = 15, scale = 2, insertable = false, updatable = false)
     private BigDecimal subtotal;
 }

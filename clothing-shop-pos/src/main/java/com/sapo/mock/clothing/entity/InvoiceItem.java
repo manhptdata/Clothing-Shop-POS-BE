@@ -1,6 +1,5 @@
-package com.sapo.mock.clothing.pos.entity;
+package com.sapo.mock.clothing.entity;
 
-import com.sapo.mock.clothing.product.entity.Product;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -27,7 +26,6 @@ public class InvoiceItem {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
-    // Snapshot tại thời điểm bán — không dùng FK để tránh ảnh hưởng khi SP thay đổi
     @Column(name = "product_name", nullable = false, length = 200)
     private String productName;
 

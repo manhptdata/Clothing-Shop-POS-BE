@@ -1,4 +1,4 @@
-package com.sapo.mock.clothing.crm.entity;
+package com.sapo.mock.clothing.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;

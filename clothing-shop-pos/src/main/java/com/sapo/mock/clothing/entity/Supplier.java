@@ -1,4 +1,4 @@
-package com.sapo.mock.clothing.warehouse.entity;
+package com.sapo.mock.clothing.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -11,18 +11,27 @@ import java.time.Instant;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "warehouse")
-public class Warehouse {
+@Table(name = "supplier")
+public class Supplier {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false, length = 255)
     private String name;
+
+    @Column(length = 15)
+    private String phone;
+
+    @Column(length = 150)
+    private String email;
 
     @Column(length = 255)
     private String address;
+
+    @Column(columnDefinition = "TEXT")
+    private String note;
 
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
@@ -30,8 +39,17 @@ public class Warehouse {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "updated_at")
+    private Instant updatedAt;
+
     @PrePersist
     public void prePersist() {
         this.createdAt = Instant.now();
+        this.updatedAt = Instant.now();
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        this.updatedAt = Instant.now();
     }
 }

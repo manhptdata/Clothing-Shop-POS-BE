@@ -1,4 +1,4 @@
-package com.sapo.mock.clothing.crm.entity;
+package com.sapo.mock.clothing.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -11,26 +11,23 @@ import java.time.Instant;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "care_campaign")
-public class CareCampaign {
+@Table(name = "warehouse")
+public class Warehouse {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @Column(length = 50)
-    private String type;
-
-    @Column(nullable = false, length = 200)
+    @Column(nullable = false, length = 100)
     private String name;
 
-    @Column(name = "script_template", columnDefinition = "TEXT")
-    private String scriptTemplate;
+    @Column(length = 255)
+    private String address;
 
-    @Column(name = "is_active")
+    @Column(name = "is_active", nullable = false)
     private boolean active = true;
 
-    @Column(name = "created_at", updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
     @PrePersist

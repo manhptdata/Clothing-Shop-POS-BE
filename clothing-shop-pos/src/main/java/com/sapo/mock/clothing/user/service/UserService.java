@@ -1,6 +1,6 @@
 package com.sapo.mock.clothing.user.service;
 
-import com.sapo.mock.clothing.user.entity.User;
+import com.sapo.mock.clothing.entity.User;
 import com.sapo.mock.clothing.user.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;

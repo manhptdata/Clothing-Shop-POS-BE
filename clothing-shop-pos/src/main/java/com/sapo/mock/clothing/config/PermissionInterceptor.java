@@ -1,6 +1,6 @@
 package com.sapo.mock.clothing.config;
 
-import com.sapo.mock.clothing.user.entity.User;
+import com.sapo.mock.clothing.entity.User;
 import com.sapo.mock.clothing.user.service.UserService;
 import com.sapo.mock.clothing.util.SecurityUtil;
 import com.sapo.mock.clothing.exception.PermissionException;
