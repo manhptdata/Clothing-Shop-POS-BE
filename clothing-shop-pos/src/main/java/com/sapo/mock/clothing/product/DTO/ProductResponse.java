@@ -38,5 +38,7 @@ public class ProductResponse {
 
 	private Integer updatedByUserID;
 
+	private Integer createdByUserID;
+
 	private List<ProductAttributeResponse> attributes;
 }

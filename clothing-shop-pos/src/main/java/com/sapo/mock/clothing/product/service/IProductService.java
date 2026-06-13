@@ -11,6 +11,8 @@ public interface IProductService {
 	Page<ProductResponse> getAllProducts(Pageable pageable, String search, String productName, String sku,
 			String category);
 
-	ProductResponse creatProduct(ProductRequest request);
+	ProductResponse creatProduct(ProductRequest request, String username);
+
+	ProductResponse updateProduct(Integer id, ProductRequest request);
 
 }

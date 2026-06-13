@@ -1,6 +1,12 @@
 package com.sapo.mock.clothing.entity;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.Collections;
+
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.sapo.mock.clothing.util.constant.RoleEnum;
@@ -25,7 +31,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @Entity
 @Table(name = "user")
-public class User {
+public class User implements UserDetails {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -67,5 +73,16 @@ public class User {
 		if (this.createdAt == null) {
 			this.createdAt = Instant.now();
 		}
+	}
+
+	@Override
+	public Collection<? extends GrantedAuthority> getAuthorities() {
+		// TODO Auto-generated method stub
+		return Collections.singletonList(new SimpleGrantedAuthority(this.role.name()));
+	}
+
+	@Override
+	public String getPassword() {
+		return this.passwordHash;
 	}
 }

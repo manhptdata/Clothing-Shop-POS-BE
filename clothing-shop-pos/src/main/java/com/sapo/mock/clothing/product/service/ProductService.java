@@ -1,5 +1,6 @@
 package com.sapo.mock.clothing.product.service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -22,10 +23,14 @@ import com.sapo.mock.clothing.product.DTO.ProductResponse;
 import com.sapo.mock.clothing.product.repository.ProductAttributeRepository;
 import com.sapo.mock.clothing.product.repository.ProductRepository;
 import com.sapo.mock.clothing.specification.ProductSpecification;
+import com.sapo.mock.clothing.user.repository.UserRepository;
 import com.sapo.mock.clothing.warehouse.repository.warehouseRepository;
 import com.sapo.mock.clothing.warehouse.repository.warehouseStockRepository;
 
+import lombok.RequiredArgsConstructor;
+
 @Service
+@RequiredArgsConstructor
 public class ProductService implements IProductService {
 	@Autowired
 	private ProductRepository productRepository;
@@ -41,6 +46,8 @@ public class ProductService implements IProductService {
 
 	@Autowired
 	private warehouseStockRepository warehouseStockRepository;
+
+	private final UserRepository userRepository;
 
 	public ProductResponse toProductResponse(Product product) {
 		if (product == null) {
@@ -71,7 +78,12 @@ public class ProductService implements IProductService {
 
 		// Xử lý mapping user ID
 		if (product.getUpdatedBy() != null) {
-			response.setUpdatedByUserID(product.getUpdatedBy().getId());
+//			response.setUpdatedByUserID(product.getUpdatedBy().getId());
+			response.setUpdatedByUserID(product.getUpdatedBy());
+		}
+		if (product.getCreatedBy() != null) {
+//			response.setCreatedByUserID(product.getCreatedBy().getId());
+			response.setCreatedByUserID(product.getCreatedBy());
 		}
 		if (product.getAttributes() != null && !product.getAttributes().isEmpty()) {
 			List<ProductAttributeResponse> attrDtos = product.getAttributes().stream()
@@ -107,14 +119,14 @@ public class ProductService implements IProductService {
 
 	@Override
 	@Transactional
-	public ProductResponse creatProduct(ProductRequest request) {
+	public ProductResponse creatProduct(ProductRequest request, String username) {
+
 		// 1. Khởi tạo và map dữ liệu Product
 		Product product = new Product();
 		mapRequestToEntity(request, product);
-		product.setImageUrls(request.getImageUrls()); // Nhờ kiểu JSON, gán thẳng List<String>
+		product.setImageUrls(request.getImageUrls());
 
-		// Cần có entity User từ userId để set người tạo (updated_by)
-		// product.setUpdatedBy(user);
+//		product.setCreatedBy(creatorProxy);
 
 		// 2. Xử lý Attributes
 		product.setAttributes(new ArrayList<>());
@@ -146,5 +158,35 @@ public class ProductService implements IProductService {
 
 		return toProductResponse(savedProduct);
 
+	}
+
+	@Override
+	@Transactional
+	public ProductResponse updateProduct(Integer id, ProductRequest request) {
+		// 1. Tìm sản phẩm
+		Product product = productRepository.findById(id)
+				.orElseThrow(() -> new RuntimeException("Sản phẩm không tồn tại"));
+
+		// 2. Cập nhật thông tin cơ bản & Ảnh
+		mapRequestToEntity(request, product);
+		product.setImageUrls(request.getImageUrls());
+		product.setUpdatedAt(LocalDateTime.now());
+
+//-------------------------------------------------------------
+
+		product.getAttributes().clear();
+		productRepository.saveAndFlush(product);
+
+		if (request.getAttributes() != null) {
+			for (ProductAttributeRequest attrReq : request.getAttributes()) {
+				ProductAttribute newAttr = new ProductAttribute();
+				newAttr.setAttrKey(attrReq.getAttrKey());
+				newAttr.setAttrValue(attrReq.getAttrValue());
+				product.addAttribute(newAttr); // Dùng Helper method
+			}
+		}
+
+		Product updatedProduct = productRepository.save(product);
+		return toProductResponse(updatedProduct);
 	}
 }
