@@ -3,9 +3,13 @@ package com.sapo.mock.clothing.entity;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -14,6 +18,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -57,14 +62,20 @@ public class Product {
 
 	private String description;
 
-	@Column(name = "image_urls", columnDefinition = "json")
-	private String imageUrls;
+	@JdbcTypeCode(SqlTypes.JSON)
+	@Column(name = "image_urls")
+	private List<String> imageUrls;
 
+	@Builder.Default
 	@Column(name = "low_stock_threshold", nullable = false)
 	private Integer lowStockThreshold = 5;
 
+	@Builder.Default
 	@Column(name = "is_deleted", nullable = false)
 	private Boolean isDeleted = false;
+
+	@OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+	private List<ProductAttribute> attributes;
 
 	@CreationTimestamp
 	@Column(name = "created_at", nullable = false, updatable = false)

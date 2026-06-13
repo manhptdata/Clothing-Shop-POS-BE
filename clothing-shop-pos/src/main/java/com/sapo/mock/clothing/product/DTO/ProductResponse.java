@@ -26,7 +26,7 @@ public class ProductResponse {
 
 	private String description;
 
-	private String imageUrls;
+	private List<String> imageUrls;
 
 	private Integer lowStockThreshold = 5;
 
@@ -38,5 +38,5 @@ public class ProductResponse {
 
 	private Integer updatedByUserID;
 
-	private List<ProductAttributeResponse> productAttributeResponses;
+	private List<ProductAttributeResponse> attributes;
 }

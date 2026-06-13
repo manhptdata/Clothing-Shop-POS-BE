@@ -22,7 +22,7 @@ public class ProductSpecification {
 			if (search != null && !search.trim().isEmpty()) {
 				String pattern = "%" + search.trim().toLowerCase() + "%";
 
-				Predicate nameLike = cb.like(cb.lower(root.get("productName")), pattern);
+				Predicate nameLike = cb.like(cb.lower(root.get("name")), pattern);
 				Predicate skuLike = cb.like(cb.lower(root.get("sku")), pattern);
 
 				predicates.add(cb.or(nameLike, skuLike));
@@ -30,12 +30,11 @@ public class ProductSpecification {
 			}
 //			filter theo tên product
 			if (productName != null && !productName.isBlank()) {
-				predicates
-						.add(cb.like(cb.lower(root.get("productName")), "%" + productName.toLowerCase().trim() + "%"));
+				predicates.add(cb.like(cb.lower(root.get("name")), "%" + productName.toLowerCase().trim() + "%"));
 
 			}
 
-			if (sku != null && !productName.isBlank()) {
+			if (sku != null && !sku.isBlank()) {
 				predicates.add(cb.like(cb.lower(root.get("sku")), "%" + sku.toLowerCase().trim() + "%"));
 			}
 

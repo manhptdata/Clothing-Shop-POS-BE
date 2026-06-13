@@ -1,23 +1,33 @@
 package com.sapo.mock.clothing.product.controller;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.sapo.mock.clothing.common.dto.response.RestResponse;
+import com.sapo.mock.clothing.product.DTO.ProductRequest;
 import com.sapo.mock.clothing.product.DTO.ProductResponse;
 import com.sapo.mock.clothing.product.service.IProductService;
 
+import lombok.RequiredArgsConstructor;
+
 @RestController
 @RequestMapping("api/v1/products")
+@RequiredArgsConstructor
 public class ProductController {
-	@Autowired
-	private IProductService productService;
+	private final IProductService productService;
+
+	private String getUser() {
+		return SecurityContextHolder.getContext().getAuthentication().getName();
+
+	}
 
 	@GetMapping()
 	public ResponseEntity<RestResponse<Page<ProductResponse>>> getAllProducts(Pageable pageable,
@@ -26,6 +36,15 @@ public class ProductController {
 		Page<ProductResponse> products = productService.getAllProducts(pageable, search, productName, sku, category);
 		RestResponse<Page<ProductResponse>> response = new RestResponse<>(200, null,
 				"Lấy danh sách sản phẩm thành công", products);
+		return ResponseEntity.ok(response);
+
+	}
+
+	@PostMapping("/creat")
+	public ResponseEntity<RestResponse<ProductResponse>> creatProduct(@RequestBody ProductRequest request) {
+		ProductResponse productResponse = productService.creatProduct(request);
+		RestResponse<ProductResponse> response = new RestResponse<>(200, null, "Tạo sản phẩm thành công",
+				productResponse);
 		return ResponseEntity.ok(response);
 
 	}
