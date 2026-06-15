@@ -1,11 +1,11 @@
-package com.sapo.mock.clothing.crm.service.impl;
+package com.sapo.mock.clothing.customer.service.impl;
 
 
-import com.sapo.mock.clothing.crm.dto.request.customer.CustomerCreateRequest;
-import com.sapo.mock.clothing.crm.dto.request.customer.CustomerUpdateRequest;
-import com.sapo.mock.clothing.crm.dto.response.CustomerResponse;
-import com.sapo.mock.clothing.crm.repository.CustomerRepository;
-import com.sapo.mock.clothing.crm.service.CustomerService;
+import com.sapo.mock.clothing.customer.dto.request.customer.CustomerCreateRequest;
+import com.sapo.mock.clothing.customer.dto.request.customer.CustomerUpdateRequest;
+import com.sapo.mock.clothing.customer.dto.response.CustomerResponse;
+import com.sapo.mock.clothing.customer.repository.CustomerRepository;
+import com.sapo.mock.clothing.customer.service.CustomerService;
 import com.sapo.mock.clothing.entity.Customer;
 import com.sapo.mock.clothing.util.constant.CustomerStatusEnum;
 import org.springframework.beans.factory.annotation.Autowired;

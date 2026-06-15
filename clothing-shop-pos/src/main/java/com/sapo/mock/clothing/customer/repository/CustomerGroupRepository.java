@@ -1,7 +1,7 @@
-package com.sapo.mock.clothing.crm.repository;
+package com.sapo.mock.clothing.customer.repository;
 
 
-import com.sapo.mock.clothing.crm.dto.response.CustomerGroupResponse;
+import com.sapo.mock.clothing.customer.dto.response.CustomerGroupResponse;
 import com.sapo.mock.clothing.entity.CustomerGroup;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -9,8 +9,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-
-import java.util.List;
 
 @Repository
 public interface CustomerGroupRepository extends JpaRepository<CustomerGroup, Integer> {
@@ -21,7 +19,7 @@ public interface CustomerGroupRepository extends JpaRepository<CustomerGroup, In
    /* JPQL ==> totalCustomers là dữ liệu dẫn xuất (derived data) — đã có thể tính được từ dữ liệu có sẵn → không cần lưu riêng,
     tránh rủi ro không đồng bộ.*/
     //  tìm kiếm nhóm ACTIVE
-    @Query("SELECT new com.sapo.mock.clothing.crm.dto.response.CustomerGroupResponse(" +
+    @Query("SELECT new com.sapo.mock.clothing.customer.dto.response.CustomerGroupResponse(" +
             "g.id, g.name, g.description, g.status, COUNT(c), g.note, g.createdAt) " +
             "FROM CustomerGroup g " +
             "LEFT JOIN Customer c ON c.customerGroup.id = g.id " +
@@ -30,7 +28,7 @@ public interface CustomerGroupRepository extends JpaRepository<CustomerGroup, In
     Page<CustomerGroupResponse> searchGroups(@Param("keyword") String keyword, Pageable pageable);
 
     // Lấy chi tiết 1 nhóm kèm theo số lượng khách
-    @Query("SELECT new com.sapo.mock.clothing.crm.dto.response.CustomerGroupResponse(" +
+    @Query("SELECT new com.sapo.mock.clothing.customer.dto.response.CustomerGroupResponse(" +
             "g.id, g.name, g.description, g.status, COUNT(c), g.note, g.createdAt) " +
             "FROM CustomerGroup g " +
             "LEFT JOIN Customer c ON c.customerGroup.id = g.id " +

@@ -1,7 +1,5 @@
-package com.sapo.mock.clothing.crm.dto.request.customer;
+package com.sapo.mock.clothing.customer.dto.request.customer;
 
-
-import com.sapo.mock.clothing.util.constant.CustomerStatusEnum;
 import com.sapo.mock.clothing.util.constant.GenderEnum;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
@@ -10,7 +8,7 @@ import java.time.LocalDate;
 
 @Getter
 @Setter
-public class CustomerUpdateRequest {
+public class CustomerCreateRequest {
 
     @NotBlank(message = "Họ tên khách hàng không được để trống")
     @Size(max = 200, message = "Họ tên không được vượt quá 200 ký tự")
@@ -29,7 +27,4 @@ public class CustomerUpdateRequest {
 
     private String address;
     private String note;
-
-    @NotNull(message = "Trạng thái không được để trống")
-    private CustomerStatusEnum status;
 }

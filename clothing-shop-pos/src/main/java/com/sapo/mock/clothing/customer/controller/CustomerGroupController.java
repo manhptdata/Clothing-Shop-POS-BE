@@ -1,13 +1,13 @@
-package com.sapo.mock.clothing.crm.controller;
+package com.sapo.mock.clothing.customer.controller;
 
 import com.sapo.mock.clothing.common.dto.response.RestResponse;
-import com.sapo.mock.clothing.crm.dto.request.groupcustomer.AssignGroupRequest;
-import com.sapo.mock.clothing.crm.dto.request.groupcustomer.CustomerGroupRequest;
-import com.sapo.mock.clothing.crm.dto.request.groupcustomer.CustomerRequest;
-import com.sapo.mock.clothing.crm.dto.response.CustomerGroupResponse;
-import com.sapo.mock.clothing.crm.dto.response.CustomerResponse;
-import com.sapo.mock.clothing.crm.service.CustomerGroupService;
-import com.sapo.mock.clothing.crm.service.CustomerService;
+import com.sapo.mock.clothing.customer.dto.request.groupcustomer.AssignGroupRequest;
+import com.sapo.mock.clothing.customer.dto.request.groupcustomer.CustomerGroupRequest;
+import com.sapo.mock.clothing.customer.dto.request.groupcustomer.CustomerRequest;
+import com.sapo.mock.clothing.customer.dto.response.CustomerGroupResponse;
+import com.sapo.mock.clothing.customer.dto.response.CustomerResponse;
+import com.sapo.mock.clothing.customer.service.CustomerGroupService;
+import com.sapo.mock.clothing.customer.service.CustomerService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;

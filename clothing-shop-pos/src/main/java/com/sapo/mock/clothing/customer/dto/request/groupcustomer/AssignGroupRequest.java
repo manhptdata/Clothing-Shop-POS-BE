@@ -1,4 +1,4 @@
-package com.sapo.mock.clothing.crm.dto.request.groupcustomer;
+package com.sapo.mock.clothing.customer.dto.request.groupcustomer;
 
 import lombok.Getter;
 import lombok.Setter;

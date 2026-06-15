@@ -1,4 +1,4 @@
-package com.sapo.mock.clothing.crm.dto.response;
+package com.sapo.mock.clothing.customer.dto.response;
 
 import com.sapo.mock.clothing.util.constant.CustomerStatusEnum;
 import com.sapo.mock.clothing.util.constant.GenderEnum;

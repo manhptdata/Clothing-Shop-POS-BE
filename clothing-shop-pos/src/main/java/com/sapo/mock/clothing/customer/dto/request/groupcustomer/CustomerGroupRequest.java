@@ -1,4 +1,4 @@
-package com.sapo.mock.clothing.crm.dto.request.groupcustomer;
+package com.sapo.mock.clothing.customer.dto.request.groupcustomer;
 
 import com.sapo.mock.clothing.util.constant.CustomerStatusEnum;
 import jakarta.validation.constraints.NotBlank;

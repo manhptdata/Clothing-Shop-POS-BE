@@ -1,9 +1,9 @@
-package com.sapo.mock.clothing.crm.service;
+package com.sapo.mock.clothing.customer.service;
 
-import com.sapo.mock.clothing.crm.dto.request.groupcustomer.CustomerGroupRequest;
-import com.sapo.mock.clothing.crm.dto.request.groupcustomer.CustomerRequest;
-import com.sapo.mock.clothing.crm.dto.response.CustomerGroupResponse;
-import com.sapo.mock.clothing.crm.dto.response.CustomerResponse;
+import com.sapo.mock.clothing.customer.dto.request.groupcustomer.CustomerGroupRequest;
+import com.sapo.mock.clothing.customer.dto.request.groupcustomer.CustomerRequest;
+import com.sapo.mock.clothing.customer.dto.response.CustomerGroupResponse;
+import com.sapo.mock.clothing.customer.dto.response.CustomerResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 

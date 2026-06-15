@@ -1,10 +1,10 @@
-package com.sapo.mock.clothing.crm.controller;
+package com.sapo.mock.clothing.customer.controller;
 
 import com.sapo.mock.clothing.common.dto.response.RestResponse;
-import com.sapo.mock.clothing.crm.dto.request.customer.CustomerCreateRequest;
-import com.sapo.mock.clothing.crm.dto.request.customer.CustomerUpdateRequest;
-import com.sapo.mock.clothing.crm.dto.response.CustomerResponse;
-import com.sapo.mock.clothing.crm.service.CustomerService;
+import com.sapo.mock.clothing.customer.dto.request.customer.CustomerCreateRequest;
+import com.sapo.mock.clothing.customer.dto.request.customer.CustomerUpdateRequest;
+import com.sapo.mock.clothing.customer.dto.response.CustomerResponse;
+import com.sapo.mock.clothing.customer.service.CustomerService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
