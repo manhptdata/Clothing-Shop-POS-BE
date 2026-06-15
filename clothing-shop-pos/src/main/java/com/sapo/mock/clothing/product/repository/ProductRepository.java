@@ -8,5 +8,5 @@ import com.sapo.mock.clothing.entity.Product;
 
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Integer>, JpaSpecificationExecutor<Product> {
-
+	boolean existsByCategory_Id(Integer categoryId);
 }

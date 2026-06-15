@@ -11,7 +11,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.sapo.mock.clothing.category.DTO.CategorySimpleResponse;
+import com.sapo.mock.clothing.category.DTO.CategoryResponse;
 import com.sapo.mock.clothing.category.repository.CategoryRepository;
 import com.sapo.mock.clothing.entity.Category;
 import com.sapo.mock.clothing.entity.Product;
@@ -57,7 +57,7 @@ public class ProductService implements IProductService {
 		response.setName(product.getName());
 		if (product.getCategory() != null) {
 
-			CategorySimpleResponse categoryDto = new CategorySimpleResponse();
+			CategoryResponse categoryDto = new CategoryResponse();
 			categoryDto.setId(product.getCategory().getId());
 			categoryDto.setName(product.getCategory().getName());
 

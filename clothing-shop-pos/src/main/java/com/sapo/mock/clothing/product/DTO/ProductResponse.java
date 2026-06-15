@@ -3,7 +3,7 @@ package com.sapo.mock.clothing.product.DTO;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import com.sapo.mock.clothing.category.DTO.CategorySimpleResponse;
+import com.sapo.mock.clothing.category.DTO.CategoryResponse;
 
 import lombok.Data;
 
@@ -13,7 +13,7 @@ public class ProductResponse {
 
 	private String name;
 
-	private CategorySimpleResponse category;
+	private CategoryResponse category;
 
 	private String description;
 
