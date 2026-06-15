@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 import com.sapo.mock.clothing.entity.InvoiceItem;
 
 @Repository
-public interface InvoiceItemRepository extends JpaRepository<InvoiceItem, Long>, JpaSpecificationExecutor<InvoiceItem> {
+public interface InvoiceItemRepository extends JpaRepository<InvoiceItem, Integer>, JpaSpecificationExecutor<InvoiceItem> {
+    java.util.List<InvoiceItem> findByInvoiceId(Integer invoiceId);
 
 }

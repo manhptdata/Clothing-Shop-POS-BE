@@ -20,8 +20,18 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+
+import com.sapo.mock.clothing.common.dto.response.ResultPaginationDTO;
+import com.sapo.mock.clothing.warehouse.repository.warehouseStockRepository;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -40,6 +50,8 @@ public class InvoiceServiceTest {
     private UserRepository userRepository;
     @Mock
     private warehouseRepository warehouseRepository;
+    @Mock
+    private warehouseStockRepository warehouseStockRepository;
     @Mock
     private CustomerRepository customerRepository;
 
@@ -148,6 +160,112 @@ public class InvoiceServiceTest {
         // Act & Assert
         assertThrows(BadRequestException.class, () -> {
             invoiceService.createInvoice(mockReqDto, "testuser");
+        });
+    }
+
+    @Test
+    void getInvoiceById_Success() {
+        // Arrange
+        Invoice invoice = new Invoice();
+        invoice.setId(100);
+        invoice.setCode("HD-001");
+        invoice.setTotalAmount(new BigDecimal("200000"));
+
+        InvoiceItem item = new InvoiceItem();
+        item.setId(1);
+        item.setProductId(1);
+        item.setQuantity(2);
+
+        when(invoiceRepository.findById(100)).thenReturn(Optional.of(invoice));
+        when(invoiceItemRepository.findByInvoiceId(100)).thenReturn(Collections.singletonList(item));
+
+        // Act
+        ResInvoiceDTO result = invoiceService.getInvoiceById(100);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(100, result.getId());
+        assertEquals(1, result.getItems().size());
+        assertEquals(2, result.getItems().get(0).getQuantity());
+    }
+
+    @Test
+    void getInvoiceById_NotFound_ThrowsException() {
+        when(invoiceRepository.findById(999)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> {
+            invoiceService.getInvoiceById(999);
+        });
+    }
+
+    @Test
+    void getAllInvoices_Success() {
+        // Arrange
+        Invoice invoice1 = new Invoice();
+        invoice1.setId(100);
+        
+        Invoice invoice2 = new Invoice();
+        invoice2.setId(101);
+
+        Pageable pageable = PageRequest.of(0, 5);
+        Page<Invoice> page = new PageImpl<>(Arrays.asList(invoice1, invoice2), pageable, 2);
+
+        when(invoiceRepository.findAll(pageable)).thenReturn(page);
+        when(invoiceItemRepository.findByInvoiceId(anyInt())).thenReturn(Collections.emptyList());
+
+        // Act
+        ResultPaginationDTO result = invoiceService.getAllInvoices(pageable);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(1, result.getMeta().getPage());
+        assertEquals(5, result.getMeta().getPageSize());
+        assertEquals(2, result.getMeta().getTotal());
+        
+        List<ResInvoiceDTO> resList = (List<ResInvoiceDTO>) result.getResult();
+        assertEquals(2, resList.size());
+    }
+
+    @Test
+    void cancelInvoice_Success() {
+        // Arrange
+        Invoice invoice = new Invoice();
+        invoice.setId(100);
+        invoice.setWarehouseId(1);
+        invoice.setStatus(InvoiceStatus.COMPLETED);
+
+        InvoiceItem item = new InvoiceItem();
+        item.setProductId(1);
+        item.setQuantity(5);
+
+        WarehouseStock stock = new WarehouseStock();
+        stock.setId(1);
+        stock.setQuantity(10); // current stock
+
+        when(invoiceRepository.findById(100)).thenReturn(Optional.of(invoice));
+        when(invoiceRepository.save(any(Invoice.class))).thenReturn(invoice);
+        when(invoiceItemRepository.findByInvoiceId(100)).thenReturn(Collections.singletonList(item));
+        when(warehouseStockRepository.findByProductIdAndWarehouseId(1, 1)).thenReturn(Optional.of(stock));
+
+        // Act
+        ResInvoiceDTO result = invoiceService.cancelInvoice(100);
+
+        // Assert
+        assertEquals(InvoiceStatus.CANCELLED, invoice.getStatus());
+        assertEquals(15, stock.getQuantity()); // 10 + 5 returned
+        verify(warehouseStockRepository, times(1)).save(stock);
+    }
+
+    @Test
+    void cancelInvoice_AlreadyCancelled_ThrowsException() {
+        Invoice invoice = new Invoice();
+        invoice.setId(100);
+        invoice.setStatus(InvoiceStatus.CANCELLED);
+
+        when(invoiceRepository.findById(100)).thenReturn(Optional.of(invoice));
+
+        assertThrows(BadRequestException.class, () -> {
+            invoiceService.cancelInvoice(100);
         });
     }
 }

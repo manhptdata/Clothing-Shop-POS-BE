@@ -11,6 +11,7 @@ import com.sapo.mock.clothing.user.repository.UserRepository;
 import com.sapo.mock.clothing.util.constant.InvoiceStatus;
 import com.sapo.mock.clothing.customer.repository.CustomerRepository;
 import com.sapo.mock.clothing.warehouse.repository.warehouseRepository;
+import com.sapo.mock.clothing.warehouse.repository.warehouseStockRepository;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,7 +26,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
+import java.util.List;
+
 import com.sapo.mock.clothing.invoice.dto.ResInvoiceDTO;
+import com.sapo.mock.clothing.common.dto.response.ResultPaginationDTO;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +42,7 @@ public class InvoiceService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final warehouseRepository warehouseRepository;
+    private final warehouseStockRepository warehouseStockRepository;
     private final CustomerRepository customerRepository;
 
     @Transactional
@@ -114,7 +121,69 @@ public class InvoiceService {
         Invoice savedInvoice = invoiceRepository.save(invoice);
         invoiceItemRepository.saveAll(invoiceItems);
 
-        // Map sang ResInvoiceDTO để trả về thực tế
+        return mapToResInvoiceDTO(savedInvoice, invoiceItems);
+    }
+
+    public ResInvoiceDTO getInvoiceById(Integer id) {
+        Invoice invoice = invoiceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Hóa đơn ID " + id + " không tồn tại"));
+        List<InvoiceItem> items = invoiceItemRepository.findByInvoiceId(id);
+        
+        return mapToResInvoiceDTO(invoice, items);
+    }
+
+    public ResultPaginationDTO getAllInvoices(Pageable pageable) {
+        Page<Invoice> pageInvoice = invoiceRepository.findAll(pageable);
+        ResultPaginationDTO rs = new ResultPaginationDTO();
+        ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
+        
+        meta.setPage(pageable.getPageNumber() + 1);
+        meta.setPageSize(pageable.getPageSize());
+        meta.setPages(pageInvoice.getTotalPages());
+        meta.setTotal(pageInvoice.getTotalElements());
+        
+        rs.setMeta(meta);
+        
+        List<ResInvoiceDTO> listRes = pageInvoice.getContent().stream()
+                .map(invoice -> {
+                    List<InvoiceItem> items = invoiceItemRepository.findByInvoiceId(invoice.getId());
+                    return mapToResInvoiceDTO(invoice, items);
+                })
+                .toList();
+                
+        rs.setResult(listRes);
+        return rs;
+    }
+
+    @Transactional
+    public ResInvoiceDTO cancelInvoice(Integer id) {
+        Invoice invoice = invoiceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Hóa đơn ID " + id + " không tồn tại"));
+                
+        if (invoice.getStatus() == InvoiceStatus.CANCELLED) {
+            throw new BadRequestException("Hóa đơn này đã bị hủy trước đó");
+        }
+        
+        // Update status
+        invoice.setStatus(InvoiceStatus.CANCELLED);
+        Invoice savedInvoice = invoiceRepository.save(invoice);
+        
+        // Restore stock
+        List<InvoiceItem> items = invoiceItemRepository.findByInvoiceId(id);
+        for (InvoiceItem item : items) {
+            WarehouseStock stock = warehouseStockRepository
+                    .findByProductIdAndWarehouseId(item.getProductId(), invoice.getWarehouseId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Không tìm thấy thông tin tồn kho của sản phẩm ID " + item.getProductId() + " trong kho " + invoice.getWarehouseId()));
+                            
+            stock.setQuantity(stock.getQuantity() + item.getQuantity());
+            warehouseStockRepository.save(stock);
+        }
+        
+        return mapToResInvoiceDTO(savedInvoice, items);
+    }
+
+    private ResInvoiceDTO mapToResInvoiceDTO(Invoice savedInvoice, List<InvoiceItem> invoiceItems) {
         List<ResInvoiceDTO.ResInvoiceItemDTO> resItems = invoiceItems.stream()
                 .map(i -> ResInvoiceDTO.ResInvoiceItemDTO.builder()
                         .id(i.getId())
