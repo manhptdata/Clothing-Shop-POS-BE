@@ -9,30 +9,34 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+@Entity
+@Table(name = "category")
 @Getter
 @Setter
 @NoArgsConstructor
-@Entity
-@Table(name = "warehouse_stock", uniqueConstraints = @UniqueConstraint(columnNames = { "product_id", "warehouse_id" }))
-public class WarehouseStock {
-
+@AllArgsConstructor
+@Builder
+public class Category {
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Integer id;
 
-	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "variant_id", nullable = false)
-	private ProductVariant variant;
+	@Column(nullable = false, unique = true, length = 100)
+	private String name;
 
-	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "warehouse_id", nullable = false)
-	private Warehouse warehouse;
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "parent_id")
+	private Category parent;
 
-	@Column(nullable = false)
-	private int quantity;
+	@Column(name = "is_active", nullable = false)
+	private boolean active = true;
+
+	@Column(name = "is_deleted", nullable = false)
+	private boolean deleted = false;
 }
