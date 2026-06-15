@@ -23,17 +23,23 @@ public class Invoice {
     @Column(nullable = false, unique = true, length = 20)
     private String code;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "customer_id", nullable = false)
-    private Customer customer;
+    @Column(name = "customer_id", nullable = false)
+    private Integer customerId;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "warehouse_id", nullable = false)
-    private Warehouse warehouse;
+    @Column(name = "warehouse_id", nullable = false)
+    private Integer warehouseId;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "created_by", nullable = false)
-    private User createdBy;
+    @Column(name = "created_by", nullable = false)
+    private Integer createdBy;
+
+    @Column(name = "customer_name", length = 100)
+    private String customerName;
+
+    @Column(name = "warehouse_name", length = 150)
+    private String warehouseName;
+
+    @Column(name = "created_by_username", length = 50)
+    private String createdByUsername;
 
     @Column(name = "total_amount", nullable = false, precision = 15, scale = 2)
     private BigDecimal totalAmount;

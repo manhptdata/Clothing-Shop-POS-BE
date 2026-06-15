@@ -51,13 +51,17 @@ public class InvoiceService {
                 .orElseThrow(() -> new ResourceNotFoundException("Kho ID " + dto.getWarehouseId() + " không tồn tại"));
 
         Customer customer = customerRepository.findById(dto.getCustomerId())
-                .orElseThrow(() -> new ResourceNotFoundException("Khách hàng ID " + dto.getCustomerId() + " không tồn tại"));
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Khách hàng ID " + dto.getCustomerId() + " không tồn tại"));
 
         // Tạo đối tượng Invoice mới
         Invoice invoice = new Invoice();
-        invoice.setCustomer(customer);
-        invoice.setWarehouse(warehouse);
-        invoice.setCreatedBy(createdBy);
+        invoice.setCustomerId(customer.getId());
+        invoice.setCustomerName(customer.getFullName());
+        invoice.setWarehouseId(warehouse.getId());
+        invoice.setWarehouseName(warehouse.getName());
+        invoice.setCreatedBy(createdBy.getId());
+        invoice.setCreatedByUsername(createdBy.getUsername());
         invoice.setNote(dto.getNote());
         invoice.setPaidAmount(dto.getPaidAmount());
         invoice.setStatus(InvoiceStatus.COMPLETED);
@@ -69,7 +73,7 @@ public class InvoiceService {
         String invoiceCode = "HD-" + dateStr + "-" + String.format("%03d", countToday + 1);
         invoice.setCode(invoiceCode);
 
-        // 4. Duyệt danh sách sản phẩm, tính tổng tiền và tạo InvoiceItem
+        // Duyệt danh sách sản phẩm, tính tổng tiền và tạo InvoiceItem
         BigDecimal totalAmount = BigDecimal.ZERO;
         List<InvoiceItem> invoiceItems = new ArrayList<>();
 
@@ -84,7 +88,7 @@ public class InvoiceService {
 
             // Snapshot thông tin sản phẩm tại thời điểm bán
             InvoiceItem item = new InvoiceItem();
-            item.setProduct(product);
+            item.setProductId(product.getId());
             item.setProductName(product.getName());
             item.setProductSku(product.getSku());
             item.setQuantity(itemDto.getQuantity());
@@ -111,27 +115,27 @@ public class InvoiceService {
         invoiceItemRepository.saveAll(invoiceItems);
 
         // Map sang ResInvoiceDTO để trả về thực tế
-        List<ResInvoiceDTO.ResInvoiceItemDTO> resItems = invoiceItems.stream().map(i -> 
-            ResInvoiceDTO.ResInvoiceItemDTO.builder()
-                .id(i.getId())
-                .productId(i.getProduct().getId())
-                .productName(i.getProductName())
-                .productSku(i.getProductSku())
-                .quantity(i.getQuantity())
-                .unitPrice(i.getUnitPrice())
-                .subtotal(i.getSubtotal())
-                .build()
-        ).toList();
+        List<ResInvoiceDTO.ResInvoiceItemDTO> resItems = invoiceItems.stream()
+                .map(i -> ResInvoiceDTO.ResInvoiceItemDTO.builder()
+                        .id(i.getId())
+                        .productId(i.getProductId())
+                        .productName(i.getProductName())
+                        .productSku(i.getProductSku())
+                        .quantity(i.getQuantity())
+                        .unitPrice(i.getUnitPrice())
+                        .subtotal(i.getSubtotal())
+                        .build())
+                .toList();
 
         return ResInvoiceDTO.builder()
                 .id(savedInvoice.getId())
                 .code(savedInvoice.getCode())
-                .customerId(savedInvoice.getCustomer().getId())
-                .customerName(savedInvoice.getCustomer().getFullName())
-                .warehouseId(savedInvoice.getWarehouse().getId())
-                .warehouseName(savedInvoice.getWarehouse().getName())
-                .createdById(savedInvoice.getCreatedBy().getId())
-                .createdByUsername(savedInvoice.getCreatedBy().getUsername())
+                .customerId(savedInvoice.getCustomerId())
+                .customerName(savedInvoice.getCustomerName())
+                .warehouseId(savedInvoice.getWarehouseId())
+                .warehouseName(savedInvoice.getWarehouseName())
+                .createdById(savedInvoice.getCreatedBy())
+                .createdByUsername(savedInvoice.getCreatedByUsername())
                 .totalAmount(savedInvoice.getTotalAmount())
                 .paidAmount(savedInvoice.getPaidAmount())
                 .changeAmount(savedInvoice.getChangeAmount())
