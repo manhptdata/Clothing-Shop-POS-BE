@@ -11,7 +11,7 @@ public class ProductRequest {
 
 	private String name;
 
-	private String category;
+	private Integer categoryId;
 
 	private String color;
 
@@ -28,4 +28,6 @@ public class ProductRequest {
 	private List<String> imageUrls;
 
 	private List<ProductAttributeRequest> attributes;
+
+	private List<ProductVariantRequest> variants;
 }

@@ -1,8 +1,9 @@
 package com.sapo.mock.clothing.product.DTO;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+
+import com.sapo.mock.clothing.category.DTO.CategorySimpleResponse;
 
 import lombok.Data;
 
@@ -10,23 +11,11 @@ import lombok.Data;
 public class ProductResponse {
 	private Integer id;
 
-	private String sku;
-
 	private String name;
 
-	private String category;
-
-	private String color;
-
-	private String size;
-
-	private BigDecimal salePrice;
-
-	private BigDecimal importPrice;
+	private CategorySimpleResponse category;
 
 	private String description;
-
-	private List<String> imageUrls;
 
 	private Integer lowStockThreshold = 5;
 
@@ -40,5 +29,9 @@ public class ProductResponse {
 
 	private Integer createdByUserID;
 
+	private List<String> imageUrls;
+
 	private List<ProductAttributeResponse> attributes;
+
+	private List<ProductVariantResponse> variants;
 }
