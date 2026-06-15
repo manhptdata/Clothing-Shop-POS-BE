@@ -107,6 +107,11 @@ public class InvoiceServiceTest {
 
         when(invoiceRepository.countByCreatedAtAfter(any())).thenReturn(0L);
 
+        WarehouseStock stock = new WarehouseStock();
+        stock.setId(1);
+        stock.setQuantity(50);
+        when(warehouseStockRepository.findByProductIdAndWarehouseId(1, 1)).thenReturn(Optional.of(stock));
+
         Invoice savedInvoice = new Invoice();
         savedInvoice.setId(100);
         savedInvoice.setCode("HD-20230101-001");
@@ -211,7 +216,7 @@ public class InvoiceServiceTest {
         Page<Invoice> page = new PageImpl<>(Arrays.asList(invoice1, invoice2), pageable, 2);
 
         when(invoiceRepository.findAll(pageable)).thenReturn(page);
-        when(invoiceItemRepository.findByInvoiceId(anyInt())).thenReturn(Collections.emptyList());
+        when(invoiceItemRepository.findByInvoiceIdIn(anyList())).thenReturn(Collections.emptyList());
 
         // Act
         ResultPaginationDTO result = invoiceService.getAllInvoices(pageable);

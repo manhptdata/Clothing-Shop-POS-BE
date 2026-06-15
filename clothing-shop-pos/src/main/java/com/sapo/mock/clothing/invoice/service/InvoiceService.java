@@ -117,6 +117,9 @@ public class InvoiceService {
         invoice.setTotalAmount(totalAmount);
         invoice.setChangeAmount(dto.getPaidAmount().subtract(totalAmount));
 
+        // Kiểm tra và trừ kho trước khi chốt đơn
+        this.deductWarehouseStock(dto.getItems(), warehouse.getId());
+
         // Lưu hóa đơn cha trước (để có ID), sau đó lưu các dòng chi tiết
         Invoice savedInvoice = invoiceRepository.save(invoice);
         invoiceItemRepository.saveAll(invoiceItems);
@@ -128,7 +131,7 @@ public class InvoiceService {
         Invoice invoice = invoiceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Hóa đơn ID " + id + " không tồn tại"));
         List<InvoiceItem> items = invoiceItemRepository.findByInvoiceId(id);
-        
+
         return mapToResInvoiceDTO(invoice, items);
     }
 
@@ -136,21 +139,30 @@ public class InvoiceService {
         Page<Invoice> pageInvoice = invoiceRepository.findAll(pageable);
         ResultPaginationDTO rs = new ResultPaginationDTO();
         ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
-        
+
         meta.setPage(pageable.getPageNumber() + 1);
         meta.setPageSize(pageable.getPageSize());
         meta.setPages(pageInvoice.getTotalPages());
         meta.setTotal(pageInvoice.getTotalElements());
-        
+
         rs.setMeta(meta);
-        
+
+        List<Integer> invoiceIds = pageInvoice.getContent().stream()
+                .map(Invoice::getId)
+                .toList();
+
+        List<InvoiceItem> allItems = invoiceIds.isEmpty() ? new ArrayList<>()
+                : invoiceItemRepository.findByInvoiceIdIn(invoiceIds);
+        java.util.Map<Integer, List<InvoiceItem>> itemsByInvoiceId = allItems.stream()
+                .collect(java.util.stream.Collectors.groupingBy(item -> item.getInvoice().getId()));
+
         List<ResInvoiceDTO> listRes = pageInvoice.getContent().stream()
                 .map(invoice -> {
-                    List<InvoiceItem> items = invoiceItemRepository.findByInvoiceId(invoice.getId());
+                    List<InvoiceItem> items = itemsByInvoiceId.getOrDefault(invoice.getId(), new ArrayList<>());
                     return mapToResInvoiceDTO(invoice, items);
                 })
                 .toList();
-                
+
         rs.setResult(listRes);
         return rs;
     }
@@ -159,27 +171,28 @@ public class InvoiceService {
     public ResInvoiceDTO cancelInvoice(Integer id) {
         Invoice invoice = invoiceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Hóa đơn ID " + id + " không tồn tại"));
-                
+
         if (invoice.getStatus() == InvoiceStatus.CANCELLED) {
             throw new BadRequestException("Hóa đơn này đã bị hủy trước đó");
         }
-        
+
         // Update status
         invoice.setStatus(InvoiceStatus.CANCELLED);
         Invoice savedInvoice = invoiceRepository.save(invoice);
-        
+
         // Restore stock
         List<InvoiceItem> items = invoiceItemRepository.findByInvoiceId(id);
         for (InvoiceItem item : items) {
             WarehouseStock stock = warehouseStockRepository
                     .findByProductIdAndWarehouseId(item.getProductId(), invoice.getWarehouseId())
                     .orElseThrow(() -> new ResourceNotFoundException(
-                            "Không tìm thấy thông tin tồn kho của sản phẩm ID " + item.getProductId() + " trong kho " + invoice.getWarehouseId()));
-                            
+                            "Không tìm thấy thông tin tồn kho của sản phẩm ID " + item.getProductId() + " trong kho "
+                                    + invoice.getWarehouseId()));
+
             stock.setQuantity(stock.getQuantity() + item.getQuantity());
             warehouseStockRepository.save(stock);
         }
-        
+
         return mapToResInvoiceDTO(savedInvoice, items);
     }
 
@@ -214,5 +227,24 @@ public class InvoiceService {
                 .updatedAt(savedInvoice.getUpdatedAt())
                 .items(resItems)
                 .build();
+    }
+
+    private void deductWarehouseStock(List<ReqCreateInvoiceDTO.InvoiceItemDTO> items, Integer warehouseId) {
+        for (ReqCreateInvoiceDTO.InvoiceItemDTO itemDto : items) {
+            WarehouseStock stock = warehouseStockRepository
+                    .findByProductIdAndWarehouseId(itemDto.getProductId(), warehouseId)
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Không tìm thấy thông tin tồn kho của sản phẩm ID " + itemDto.getProductId() + " trong kho "
+                                    + warehouseId));
+
+            if (stock.getQuantity() < itemDto.getQuantity()) {
+                throw new BadRequestException("Sản phẩm ID " + itemDto.getProductId()
+                        + " không đủ số lượng trong kho (Hiện có: " + stock.getQuantity() + ")");
+            }
+
+            // Thực hiện trừ kho vật lý
+            stock.setQuantity(stock.getQuantity() - itemDto.getQuantity());
+            warehouseStockRepository.save(stock);
+        }
     }
 }
