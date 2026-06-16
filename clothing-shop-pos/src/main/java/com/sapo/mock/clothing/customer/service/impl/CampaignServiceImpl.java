@@ -167,11 +167,11 @@ public class CampaignServiceImpl implements CampaignService {
         }
 
         // Map hóa đơn nếu có
-        if (careLog.getInvoice() != null) {
-            CareLogResponse.InvoiceInfo info = new CareLogResponse.InvoiceInfo();
-            info.setId(careLog.getInvoice().getId());
-            info.setCode(careLog.getInvoice().getCode());
-            res.setInvoice(info);
+        if (careLog.getOrder() != null) {
+            CareLogResponse.OrderInfo info = new CareLogResponse.OrderInfo();
+            info.setId(careLog.getOrder().getId());
+            info.setOrderNumber(careLog.getOrder().getOrderNumber());
+            res.setOrder(info);
         }
 
         return res;

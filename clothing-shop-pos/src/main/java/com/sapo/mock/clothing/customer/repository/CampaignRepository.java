@@ -17,9 +17,9 @@ public interface CampaignRepository extends JpaRepository<Customer, Integer> {
      * khớp trong khoảng mốc thời gian của ngày cách đây đúng 7 ngày.
      */
     @Query("SELECT DISTINCT c FROM Customer c " +
-            "JOIN Invoice i ON c.id = i.customerId " +
-            "WHERE i.status = com.sapo.mock.clothing.util.constant.InvoiceStatus.COMPLETED " +
-            "AND i.createdAt >= :startTime AND i.createdAt <= :endTime " +
+            "JOIN Order o ON c.id = o.customerId " +
+            "WHERE o.status = com.sapo.mock.clothing.util.constant.InvoiceStatus.COMPLETED " +
+            "AND o.createdAt >= :startTime AND o.createdAt <= :endTime " +
             "AND c.status = com.sapo.mock.clothing.util.constant.CustomerStatusEnum.ACTIVE")
     Page<Customer> findCustomersAfter7DaysBuy(
             @Param("startTime") Instant startTime,
@@ -35,9 +35,9 @@ public interface CampaignRepository extends JpaRepository<Customer, Integer> {
     @Query("SELECT c FROM Customer c " +
             "WHERE c.status = com.sapo.mock.clothing.util.constant.CustomerStatusEnum.ACTIVE " +
             "AND c.id NOT IN (" +
-            "    SELECT DISTINCT i.customerId FROM Invoice i " +
-            "    WHERE i.status = com.sapo.mock.clothing.util.constant.InvoiceStatus.COMPLETED " +
-            "    AND i.createdAt >= :thirtyDaysAgo" +
+            "    SELECT DISTINCT o.customerId FROM Order o " +
+            "    WHERE o.status = com.sapo.mock.clothing.util.constant.InvoiceStatus.COMPLETED " +
+            "    AND o.createdAt >= :thirtyDaysAgo" +
             ")")
     Page<Customer> findCustomersLongTimeNoBuy(
             @Param("thirtyDaysAgo") Instant thirtyDaysAgo,

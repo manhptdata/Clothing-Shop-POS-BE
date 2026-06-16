@@ -19,7 +19,7 @@ public interface CareLogRepository extends JpaRepository<CareLog, Integer> {
             "JOIN FETCH cl.customer " +
             "JOIN FETCH cl.calledBy " +
             "LEFT JOIN FETCH cl.campaign " +
-            "LEFT JOIN FETCH cl.invoice")
+            "LEFT JOIN FETCH cl.order")
     Page<CareLog> findAllCareLogs(Pageable pageable);
 
     /**
@@ -29,7 +29,7 @@ public interface CareLogRepository extends JpaRepository<CareLog, Integer> {
             "JOIN FETCH cl.customer " +
             "JOIN FETCH cl.calledBy " +
             "LEFT JOIN FETCH cl.campaign " +
-            "LEFT JOIN FETCH cl.invoice " +
+            "LEFT JOIN FETCH cl.order " +
             "WHERE cl.customer.id = :customerId")
     Page<CareLog> findByCustomerId(@Param("customerId") Integer customerId, Pageable pageable);
 }

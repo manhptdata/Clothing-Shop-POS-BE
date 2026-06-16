@@ -18,7 +18,7 @@ public class CareLogResponse {
     private CustomerInfo customer;
     private CampaignInfo campaign;
     private UserInfo calledBy;
-    private InvoiceInfo invoice;
+    private OrderInfo order;
 
     @Getter
     @Setter
@@ -45,8 +45,8 @@ public class CareLogResponse {
 
     @Getter
     @Setter
-    public static class InvoiceInfo {
+    public static class OrderInfo {
         private Integer id;
-        private String code;
+        private String orderNumber;
     }
 }
