@@ -2,26 +2,27 @@ package com.sapo.mock.clothing.product.service;
 
 import org.springframework.stereotype.Service;
 
+import com.sapo.mock.clothing.entity.ProductAttribute;
 import com.sapo.mock.clothing.product.DTO.ProductAttributeResponse;
 
 @Service
-public class ProductAttributeService implements IProductAttributeService {
+public class ProductAttributeService {
 
-	public ProductAttributeResponse toProductAttributesResponse(
-			com.sapo.mock.clothing.entity.ProductAttribute productAttribute) {
-		try {
-			ProductAttributeResponse productAttributesResponse = new ProductAttributeResponse();
-			productAttributesResponse.setId(productAttribute.getId());
-			productAttributesResponse.setAttrKey(productAttribute.getAttrKey());
-			productAttributesResponse.setAttrValue(productAttribute.getAttrValue());
-			productAttributesResponse.setProductID(productAttribute.getProduct().getId());
-
-			return productAttributesResponse;
-		} catch (Exception e) {
+	public ProductAttributeResponse toProductAttributesResponse(ProductAttribute attribute) {
+		if (attribute == null) {
 			return null;
-
 		}
 
-	}
+		ProductAttributeResponse response = new ProductAttributeResponse();
+		response.setId(attribute.getId());
 
+		if (attribute.getProduct() != null) {
+			response.setProductID(attribute.getProduct().getId());
+		}
+
+		response.setAttrKey(attribute.getAttrKey());
+		response.setAttrValue(attribute.getAttrValue());
+
+		return response;
+	}
 }
