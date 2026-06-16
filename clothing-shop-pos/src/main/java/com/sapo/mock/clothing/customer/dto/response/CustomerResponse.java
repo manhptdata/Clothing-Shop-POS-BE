@@ -4,6 +4,8 @@ import com.sapo.mock.clothing.util.constant.CustomerStatusEnum;
 import com.sapo.mock.clothing.util.constant.GenderEnum;
 import lombok.Getter;
 import lombok.Setter;
+
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.Instant;
 
@@ -28,10 +30,14 @@ public class CustomerResponse {
     // Object con trả về thông tin nhóm rút gọn (chỉ gồm ID và Tên nhóm)
     private GroupInfo customerGroup;
 
+
+
     @Getter
     @Setter
     public static class GroupInfo {
         private Integer id;
         private String name;
     }
+
+
 }

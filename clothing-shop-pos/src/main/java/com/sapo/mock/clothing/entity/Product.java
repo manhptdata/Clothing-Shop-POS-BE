@@ -1,3 +1,4 @@
+
 package com.sapo.mock.clothing.entity;
 
 import java.time.LocalDateTime;
@@ -60,11 +61,13 @@ public class Product {
 	private Boolean isDeleted = false;
 
 	@OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
-	private List<ProductAttribute> attributes = new ArrayList<>();
+	private List<ProductOption> options = new ArrayList<>();
 
-	// THÊM MỚI: Danh sách biến thể (Variant)
 	@OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<ProductVariant> variants = new ArrayList<>();
+
+	@OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+	private List<ProductAttribute> attributes = new ArrayList<>();
 
 	public void addAttribute(ProductAttribute attr) {
 		attributes.add(attr);

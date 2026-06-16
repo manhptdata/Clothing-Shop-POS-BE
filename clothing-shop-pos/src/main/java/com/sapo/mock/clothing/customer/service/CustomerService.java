@@ -27,5 +27,9 @@ public interface CustomerService {
     // Get customers by group ID, only ACTIVE ones.
     Page<CustomerResponse> getCustomersByGroupId(Integer groupId, Pageable pageable);
 
+
+
+
+
 }
 
