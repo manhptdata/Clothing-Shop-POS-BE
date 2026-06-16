@@ -17,20 +17,16 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "product_attribute")
-public class ProductAttribute {
-
+@Table(name = "product_option_value")
+public class ProductOptionValue {
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Integer id;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "product_id", nullable = false)
-	private Product product;
+	@JoinColumn(name = "product_option_id", nullable = false)
+	private ProductOption productOption;
 
-	@Column(name = "attr_key", nullable = false, length = 100)
-	private String attrKey;
-
-	@Column(name = "attr_value", nullable = false, columnDefinition = "TEXT")
-	private String attrValue;
+	@Column(nullable = false, length = 100)
+	private String value;
 }

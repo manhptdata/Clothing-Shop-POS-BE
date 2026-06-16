@@ -24,7 +24,7 @@ public class ReturnTicket {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "original_invoice_id", nullable = false)
-    private Invoice originalInvoice;
+    private Order originalInvoice;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "customer_id", nullable = false)

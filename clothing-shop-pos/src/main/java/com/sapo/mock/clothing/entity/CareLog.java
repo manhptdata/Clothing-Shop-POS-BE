@@ -28,7 +28,7 @@ public class CareLog {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "invoice_id")
-    private Invoice invoice;
+    private Order invoice;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "called_by", nullable = false)

@@ -1,5 +1,9 @@
 package com.sapo.mock.clothing.entity;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -8,8 +12,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -18,21 +22,22 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "warehouse_stock", uniqueConstraints = @UniqueConstraint(columnNames = { "product_id", "warehouse_id" }))
-public class WarehouseStock {
-
+@Table(name = "product_option")
+public class ProductOption {
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Integer id;
 
-	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "variant_id", nullable = false)
-	private ProductVariant variant;
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "product_id", nullable = false)
+	private Product product;
 
-	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "warehouse_id", nullable = false)
-	private Warehouse warehouse;
+	@Column(nullable = false, length = 100)
+	private String name;
 
 	@Column(nullable = false)
-	private int quantity;
+	private Integer position;
+
+	@OneToMany(mappedBy = "productOption", cascade = CascadeType.ALL, orphanRemoval = true)
+	private List<ProductOptionValue> values = new ArrayList<>();
 }

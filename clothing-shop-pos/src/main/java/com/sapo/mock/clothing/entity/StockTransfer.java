@@ -28,14 +28,6 @@ public class StockTransfer {
 	private Integer id;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "from_warehouse_id", nullable = false)
-	private Warehouse fromWarehouse;
-
-	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "to_warehouse_id", nullable = false)
-	private Warehouse toWarehouse;
-
-	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "variant_id", nullable = false)
 	private ProductVariant variant;
 

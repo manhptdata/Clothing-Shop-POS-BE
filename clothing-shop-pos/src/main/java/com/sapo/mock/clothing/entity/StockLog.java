@@ -36,10 +36,6 @@ public class StockLog {
 	@JoinColumn(name = "variant_id", nullable = false)
 	private ProductVariant variant;
 
-	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "warehouse_id", nullable = false)
-	private Warehouse warehouse;
-
 	@Column(name = "quantity_before", nullable = false)
 	private int quantityBefore;
 
