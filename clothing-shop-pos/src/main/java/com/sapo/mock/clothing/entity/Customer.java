@@ -53,6 +53,11 @@ public class Customer {
     private CustomerGroup customerGroup;
 
 
+//    @ManyToOne(fetch = FetchType.LAZY)
+//    @JoinColumn(name = "group_id") // Tạo cột group_id làm khóa ngoại dưới DB
+//    private CustomerGroup customerGroup;
+
+
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;
 

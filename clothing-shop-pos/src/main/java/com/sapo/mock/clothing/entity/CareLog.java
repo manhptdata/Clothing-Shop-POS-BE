@@ -1,11 +1,20 @@
 package com.sapo.mock.clothing.entity;
 
-import jakarta.persistence.*;
+import java.time.Instant;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
-import java.time.Instant;
 
 @Getter
 @Setter
@@ -14,46 +23,47 @@ import java.time.Instant;
 @Table(name = "care_log")
 public class CareLog {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private Integer id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "campaign_id")
-    private CareCampaign campaign;
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "campaign_id")
+	private CareCampaign campaign;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "customer_id", nullable = false)
-    private Customer customer;
+	@ManyToOne(fetch = FetchType.LAZY, optional = false)
+	@JoinColumn(name = "customer_id", nullable = false)
+	private Customer customer;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "invoice_id")
-    private Order invoice;
+	@ManyToOne(fetch = FetchType.LAZY)
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "called_by", nullable = false)
-    private User calledBy;
+	@JoinColumn(name = "order_id")
+	private Order order;
 
-    @Column(length = 20)
-    private String result;
+	@ManyToOne(fetch = FetchType.LAZY, optional = false)
+	@JoinColumn(name = "called_by", nullable = false)
+	private User calledBy;
 
-    @Column(columnDefinition = "TEXT")
-    private String note;
+	@Column(length = 20)
+	private String result;
 
-    @Column(name = "scheduled_at")
-    private Instant scheduledAt;
+	@Column(columnDefinition = "TEXT")
+	private String note;
 
-    @Column(name = "called_at")
-    private Instant calledAt;
+	@Column(name = "scheduled_at")
+	private Instant scheduledAt;
 
-    @Column(name = "next_retry_at")
-    private Instant nextRetryAt;
+	@Column(name = "called_at")
+	private Instant calledAt;
 
-    @Column(name = "created_at", updatable = false)
-    private Instant createdAt;
+	@Column(name = "next_retry_at")
+	private Instant nextRetryAt;
 
-    @PrePersist
-    public void prePersist() {
-        this.createdAt = Instant.now();
-    }
+	@Column(name = "created_at", updatable = false)
+	private Instant createdAt;
+
+	@PrePersist
+	public void prePersist() {
+		this.createdAt = Instant.now();
+	}
 }

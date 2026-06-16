@@ -114,4 +114,18 @@ public class GlobalExceptionHandler {
 		response.setMessage(exception.getMessage());
 		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
 	}
+
+    /**
+     * crm
+     * Xử lý riêng các lỗi Logic nghiệp vụ (Nhập sai ID, trùng SĐT...)
+     */
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<RestResponse<Object>> handleRuntimeException(RuntimeException exception) {
+        RestResponse<Object> response = new RestResponse<>();
+        response.setStatusCode(HttpStatus.BAD_REQUEST.value()); // Mã 400: Yêu cầu không hợp lệ
+        response.setError("Lỗi xử lý nghiệp vụ");
+        response.setMessage(exception.getMessage()); // Trả về câu "Không tìm thấy khách hàng..."
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
 }
