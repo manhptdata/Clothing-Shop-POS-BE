@@ -8,20 +8,21 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 
 @Getter
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "invoice")
-public class Invoice {
+@Table(name = "orders")
+public class Order {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @Column(nullable = false, unique = true, length = 20)
-    private String code;
+    @Column(name = "order_number", nullable = false, unique = true, length = 20)
+    private String orderNumber;
 
     @Column(name = "customer_id", nullable = false)
     private Integer customerId;
@@ -54,6 +55,9 @@ public class Invoice {
     @Column(nullable = false, length = 20)
     private InvoiceStatus status = InvoiceStatus.COMPLETED;
 
+    @Column(name = "is_printed", nullable = false)
+    private boolean isPrinted = false;
+
     @Column(columnDefinition = "TEXT")
     private String note;
 
@@ -62,6 +66,9 @@ public class Invoice {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<OrderLineItem> items;
 
     @PrePersist
     public void prePersist() {

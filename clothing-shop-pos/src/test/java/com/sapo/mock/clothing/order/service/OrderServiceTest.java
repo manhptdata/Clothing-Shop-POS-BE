@@ -1,12 +1,12 @@
-package com.sapo.mock.clothing.invoice.service;
+package com.sapo.mock.clothing.order.service;
 
 import com.sapo.mock.clothing.entity.*;
 import com.sapo.mock.clothing.exception.BadRequestException;
 import com.sapo.mock.clothing.exception.ResourceNotFoundException;
-import com.sapo.mock.clothing.invoice.dto.ReqCreateInvoiceDTO;
-import com.sapo.mock.clothing.invoice.dto.ResInvoiceDTO;
-import com.sapo.mock.clothing.invoice.repository.InvoiceItemRepository;
-import com.sapo.mock.clothing.invoice.repository.InvoiceRepository;
+import com.sapo.mock.clothing.order.dto.ReqCreateOrderDTO;
+import com.sapo.mock.clothing.order.dto.ResOrderDTO;
+import com.sapo.mock.clothing.order.repository.OrderLineItemRepository;
+import com.sapo.mock.clothing.order.repository.OrderRepository;
 import com.sapo.mock.clothing.product.repository.ProductRepository;
 import com.sapo.mock.clothing.user.repository.UserRepository;
 import com.sapo.mock.clothing.customer.repository.CustomerRepository;
@@ -38,12 +38,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class InvoiceServiceTest {
+public class OrderServiceTest {
 
     @Mock
-    private InvoiceRepository invoiceRepository;
+    private OrderRepository orderRepository;
     @Mock
-    private InvoiceItemRepository invoiceItemRepository;
+    private OrderLineItemRepository orderLineItemRepository;
     @Mock
     private ProductRepository productRepository;
     @Mock
@@ -56,13 +56,13 @@ public class InvoiceServiceTest {
     private CustomerRepository customerRepository;
 
     @InjectMocks
-    private InvoiceService invoiceService;
+    private OrderService orderService;
 
     private User mockUser;
     private Warehouse mockWarehouse;
     private Customer mockCustomer;
     private Product mockProduct;
-    private ReqCreateInvoiceDTO mockReqDto;
+    private ReqCreateOrderDTO mockReqDto;
 
     @BeforeEach
     void setUp() {
@@ -84,52 +84,53 @@ public class InvoiceServiceTest {
         mockProduct.setSku("AT-01");
         mockProduct.setSalePrice(new BigDecimal("100000"));
 
-        mockReqDto = new ReqCreateInvoiceDTO();
+        mockReqDto = new ReqCreateOrderDTO();
         mockReqDto.setCustomerId(1);
         mockReqDto.setWarehouseId(1);
-        mockReqDto.setNote("Test invoice");
+        mockReqDto.setNote("Test order");
         mockReqDto.setPaidAmount(new BigDecimal("200000"));
 
-        ReqCreateInvoiceDTO.InvoiceItemDTO itemDto = new ReqCreateInvoiceDTO.InvoiceItemDTO();
-        itemDto.setProductId(1);
+        ReqCreateOrderDTO.OrderItemDTO itemDto = new ReqCreateOrderDTO.OrderItemDTO();
+        itemDto.setVariantId(1);
         itemDto.setQuantity(2);
 
         mockReqDto.setItems(Collections.singletonList(itemDto));
     }
 
     @Test
-    void createInvoice_Success() {
+    void createOrder_Success() {
         // Arrange
         when(userRepository.findByUsername("testuser")).thenReturn(mockUser);
         when(warehouseRepository.findById(1)).thenReturn(Optional.of(mockWarehouse));
         when(customerRepository.findById(1)).thenReturn(Optional.of(mockCustomer));
         when(productRepository.findById(1)).thenReturn(Optional.of(mockProduct));
 
-        when(invoiceRepository.countByCreatedAtAfter(any())).thenReturn(0L);
+        when(orderRepository.countByCreatedAtAfter(any())).thenReturn(0L);
 
         WarehouseStock stock = new WarehouseStock();
         stock.setId(1);
         stock.setQuantity(50);
         when(warehouseStockRepository.findByProductIdAndWarehouseId(1, 1)).thenReturn(Optional.of(stock));
 
-        Invoice savedInvoice = new Invoice();
-        savedInvoice.setId(100);
-        savedInvoice.setCode("HD-20230101-001");
-        savedInvoice.setCustomerId(1);
-        savedInvoice.setCustomerName("Nguyễn Văn A");
-        savedInvoice.setWarehouseId(1);
-        savedInvoice.setWarehouseName("Kho Trung Tâm");
-        savedInvoice.setCreatedBy(1);
-        savedInvoice.setCreatedByUsername("testuser");
-        savedInvoice.setTotalAmount(new BigDecimal("200000"));
-        savedInvoice.setPaidAmount(new BigDecimal("200000"));
-        savedInvoice.setChangeAmount(BigDecimal.ZERO);
-        savedInvoice.setStatus(InvoiceStatus.COMPLETED);
+        Order savedOrder = new Order();
+        savedOrder.setId(100);
+        savedOrder.setOrderNumber("HD-20230101-001");
+        savedOrder.setCustomerId(1);
+        savedOrder.setCustomerName("Nguyễn Văn A");
+        savedOrder.setWarehouseId(1);
+        savedOrder.setWarehouseName("Kho Trung Tâm");
+        savedOrder.setCreatedBy(1);
+        savedOrder.setCreatedByUsername("testuser");
+        savedOrder.setTotalAmount(new BigDecimal("200000"));
+        savedOrder.setPaidAmount(new BigDecimal("200000"));
+        savedOrder.setChangeAmount(BigDecimal.ZERO);
+        savedOrder.setStatus(InvoiceStatus.COMPLETED);
+        savedOrder.setPrinted(false);
 
-        when(invoiceRepository.save(any(Invoice.class))).thenReturn(savedInvoice);
+        when(orderRepository.save(any(Order.class))).thenReturn(savedOrder);
 
         // Act
-        ResInvoiceDTO result = invoiceService.createInvoice(mockReqDto, "testuser");
+        ResOrderDTO result = orderService.createOrder(mockReqDto, "testuser");
 
         // Assert
         assertNotNull(result);
@@ -137,22 +138,23 @@ public class InvoiceServiceTest {
         assertEquals("Nguyễn Văn A", result.getCustomerName());
         assertEquals("testuser", result.getCreatedByUsername());
         assertEquals(new BigDecimal("200000"), result.getTotalAmount());
+        assertFalse(result.isPrinted());
 
-        verify(invoiceRepository, times(1)).save(any(Invoice.class));
-        verify(invoiceItemRepository, times(1)).saveAll(anyList());
+        verify(orderRepository, times(1)).save(any(Order.class));
+        verify(orderLineItemRepository, times(1)).saveAll(anyList());
     }
 
     @Test
-    void createInvoice_UserNotFound_ThrowsException() {
+    void createOrder_UserNotFound_ThrowsException() {
         when(userRepository.findByUsername("unknown")).thenReturn(null);
 
         assertThrows(ResourceNotFoundException.class, () -> {
-            invoiceService.createInvoice(mockReqDto, "unknown");
+            orderService.createOrder(mockReqDto, "unknown");
         });
     }
 
     @Test
-    void createInvoice_InsufficientPaidAmount_ThrowsException() {
+    void createOrder_InsufficientPaidAmount_ThrowsException() {
         // Arrange
         when(userRepository.findByUsername("testuser")).thenReturn(mockUser);
         when(warehouseRepository.findById(1)).thenReturn(Optional.of(mockWarehouse));
@@ -164,62 +166,64 @@ public class InvoiceServiceTest {
 
         // Act & Assert
         assertThrows(BadRequestException.class, () -> {
-            invoiceService.createInvoice(mockReqDto, "testuser");
+            orderService.createOrder(mockReqDto, "testuser");
         });
     }
 
     @Test
-    void getInvoiceById_Success() {
+    void getOrderById_Success() {
         // Arrange
-        Invoice invoice = new Invoice();
-        invoice.setId(100);
-        invoice.setCode("HD-001");
-        invoice.setTotalAmount(new BigDecimal("200000"));
+        Order order = new Order();
+        order.setId(100);
+        order.setOrderNumber("HD-001");
+        order.setTotalAmount(new BigDecimal("200000"));
+        order.setPrinted(true);
 
-        InvoiceItem item = new InvoiceItem();
+        OrderLineItem item = new OrderLineItem();
         item.setId(1);
         item.setProductId(1);
         item.setQuantity(2);
 
-        when(invoiceRepository.findById(100)).thenReturn(Optional.of(invoice));
-        when(invoiceItemRepository.findByInvoiceId(100)).thenReturn(Collections.singletonList(item));
+        when(orderRepository.findById(100)).thenReturn(Optional.of(order));
+        when(orderLineItemRepository.findByOrderId(100)).thenReturn(Collections.singletonList(item));
 
         // Act
-        ResInvoiceDTO result = invoiceService.getInvoiceById(100);
+        ResOrderDTO result = orderService.getOrderById(100);
 
         // Assert
         assertNotNull(result);
         assertEquals(100, result.getId());
         assertEquals(1, result.getItems().size());
         assertEquals(2, result.getItems().get(0).getQuantity());
+        assertTrue(result.isPrinted());
     }
 
     @Test
-    void getInvoiceById_NotFound_ThrowsException() {
-        when(invoiceRepository.findById(999)).thenReturn(Optional.empty());
+    void getOrderById_NotFound_ThrowsException() {
+        when(orderRepository.findById(999)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> {
-            invoiceService.getInvoiceById(999);
+            orderService.getOrderById(999);
         });
     }
 
     @Test
-    void getAllInvoices_Success() {
+    void getAllOrders_Success() {
         // Arrange
-        Invoice invoice1 = new Invoice();
-        invoice1.setId(100);
+        Order order1 = new Order();
+        order1.setId(100);
         
-        Invoice invoice2 = new Invoice();
-        invoice2.setId(101);
+        Order order2 = new Order();
+        order2.setId(101);
 
         Pageable pageable = PageRequest.of(0, 5);
-        Page<Invoice> page = new PageImpl<>(Arrays.asList(invoice1, invoice2), pageable, 2);
+        Page<Order> page = new PageImpl<>(Arrays.asList(order1, order2), pageable, 2);
 
-        when(invoiceRepository.findAll(pageable)).thenReturn(page);
-        when(invoiceItemRepository.findByInvoiceIdIn(anyList())).thenReturn(Collections.emptyList());
+        when(orderRepository.findAll(pageable)).thenReturn(page);
+        when(orderLineItemRepository.findByOrderIdIn(anyList())).thenReturn(Collections.emptyList());
 
         // Act
-        ResultPaginationDTO result = invoiceService.getAllInvoices(pageable);
+        ResultPaginationDTO result = orderService.getAllOrders(pageable);
 
         // Assert
         assertNotNull(result);
@@ -227,19 +231,19 @@ public class InvoiceServiceTest {
         assertEquals(5, result.getMeta().getPageSize());
         assertEquals(2, result.getMeta().getTotal());
         
-        List<ResInvoiceDTO> resList = (List<ResInvoiceDTO>) result.getResult();
+        List<ResOrderDTO> resList = (List<ResOrderDTO>) result.getResult();
         assertEquals(2, resList.size());
     }
 
     @Test
-    void cancelInvoice_Success() {
+    void cancelOrder_Success() {
         // Arrange
-        Invoice invoice = new Invoice();
-        invoice.setId(100);
-        invoice.setWarehouseId(1);
-        invoice.setStatus(InvoiceStatus.COMPLETED);
+        Order order = new Order();
+        order.setId(100);
+        order.setWarehouseId(1);
+        order.setStatus(InvoiceStatus.COMPLETED);
 
-        InvoiceItem item = new InvoiceItem();
+        OrderLineItem item = new OrderLineItem();
         item.setProductId(1);
         item.setQuantity(5);
 
@@ -247,30 +251,50 @@ public class InvoiceServiceTest {
         stock.setId(1);
         stock.setQuantity(10); // current stock
 
-        when(invoiceRepository.findById(100)).thenReturn(Optional.of(invoice));
-        when(invoiceRepository.save(any(Invoice.class))).thenReturn(invoice);
-        when(invoiceItemRepository.findByInvoiceId(100)).thenReturn(Collections.singletonList(item));
+        when(orderRepository.findById(100)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenReturn(order);
+        when(orderLineItemRepository.findByOrderId(100)).thenReturn(Collections.singletonList(item));
         when(warehouseStockRepository.findByProductIdAndWarehouseId(1, 1)).thenReturn(Optional.of(stock));
 
         // Act
-        ResInvoiceDTO result = invoiceService.cancelInvoice(100);
+        ResOrderDTO result = orderService.cancelOrder(100);
 
         // Assert
-        assertEquals(InvoiceStatus.CANCELLED, invoice.getStatus());
+        assertEquals(InvoiceStatus.CANCELLED, order.getStatus());
         assertEquals(15, stock.getQuantity()); // 10 + 5 returned
         verify(warehouseStockRepository, times(1)).save(stock);
     }
 
     @Test
-    void cancelInvoice_AlreadyCancelled_ThrowsException() {
-        Invoice invoice = new Invoice();
-        invoice.setId(100);
-        invoice.setStatus(InvoiceStatus.CANCELLED);
+    void cancelOrder_AlreadyCancelled_ThrowsException() {
+        Order order = new Order();
+        order.setId(100);
+        order.setStatus(InvoiceStatus.CANCELLED);
 
-        when(invoiceRepository.findById(100)).thenReturn(Optional.of(invoice));
+        when(orderRepository.findById(100)).thenReturn(Optional.of(order));
 
         assertThrows(BadRequestException.class, () -> {
-            invoiceService.cancelInvoice(100);
+            orderService.cancelOrder(100);
         });
+    }
+
+    @Test
+    void updatePrintStatus_Success() {
+        // Arrange
+        Order order = new Order();
+        order.setId(100);
+        order.setPrinted(false);
+
+        when(orderRepository.findById(100)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenReturn(order);
+        when(orderLineItemRepository.findByOrderId(100)).thenReturn(Collections.emptyList());
+
+        // Act
+        ResOrderDTO result = orderService.updatePrintStatus(100, true);
+
+        // Assert
+        assertTrue(order.isPrinted());
+        assertTrue(result.isPrinted());
+        verify(orderRepository, times(1)).save(order);
     }
 }

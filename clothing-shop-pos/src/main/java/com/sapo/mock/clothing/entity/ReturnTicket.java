@@ -23,8 +23,8 @@ public class ReturnTicket {
     private String ticketNo;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "original_invoice_id", nullable = false)
-    private Invoice originalInvoice;
+    @JoinColumn(name = "original_order_id", nullable = false)
+    private Order originalOrder;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "customer_id", nullable = false)

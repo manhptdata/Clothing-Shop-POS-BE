@@ -1,4 +1,4 @@
-package com.sapo.mock.clothing.invoice.dto;
+package com.sapo.mock.clothing.order.dto;
 
 import com.sapo.mock.clothing.util.constant.InvoiceStatus;
 import lombok.Builder;
@@ -12,9 +12,10 @@ import java.util.List;
 @Getter
 @Setter
 @Builder
-public class ResInvoiceDTO {
+public class ResOrderDTO {
+
     private Integer id;
-    private String code;
+    private String orderNumber;
 
     private Integer customerId;
     private String customerName;
@@ -30,17 +31,18 @@ public class ResInvoiceDTO {
     private BigDecimal changeAmount;
 
     private InvoiceStatus status;
+    private boolean isPrinted;
     private String note;
 
     private Instant createdAt;
     private Instant updatedAt;
 
-    private List<ResInvoiceItemDTO> items;
+    private List<ResOrderItemDTO> items;
 
     @Getter
     @Setter
     @Builder
-    public static class ResInvoiceItemDTO {
+    public static class ResOrderItemDTO {
         private Integer id;
         private Integer productId;
         private String productName;

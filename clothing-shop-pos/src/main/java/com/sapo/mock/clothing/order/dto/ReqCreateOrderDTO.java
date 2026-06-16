@@ -1,14 +1,16 @@
-package com.sapo.mock.clothing.invoice.dto;
+package com.sapo.mock.clothing.order.dto;
 
-import java.math.BigDecimal;
-import java.util.List;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
+import java.util.List;
+
 @Getter
 @Setter
-public class ReqCreateInvoiceDTO {
+public class ReqCreateOrderDTO {
+
     @NotNull(message = "Customer ID không được để trống")
     private Integer customerId;
 
@@ -19,12 +21,13 @@ public class ReqCreateInvoiceDTO {
     private BigDecimal paidAmount;
 
     private String note;
-    private List<InvoiceItemDTO> items;
+
+    private List<OrderItemDTO> items;
 
     @Getter
     @Setter
-    public static class InvoiceItemDTO {
-        private Integer productId;
+    public static class OrderItemDTO {
+        private Integer variantId;
         private Integer quantity;
     }
 }

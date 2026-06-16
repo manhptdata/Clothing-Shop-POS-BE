@@ -11,16 +11,16 @@ import java.math.BigDecimal;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "invoice_item")
-public class InvoiceItem {
+@Table(name = "order_line_item")
+public class OrderLineItem {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "invoice_id", nullable = false)
-    private Invoice invoice;
+    @JoinColumn(name = "order_id", nullable = false)
+    private Order order;
 
     @Column(name = "product_id", nullable = false)
     private Integer productId;
