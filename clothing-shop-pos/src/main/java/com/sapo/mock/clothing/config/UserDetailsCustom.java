@@ -1,14 +1,15 @@
 package com.sapo.mock.clothing.config;
 
-import com.sapo.mock.clothing.entity.User;
-import com.sapo.mock.clothing.user.service.UserService;
+import java.util.Collections;
+
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Component;
 
-import java.util.Collections;
+import com.sapo.mock.clothing.entity.User;
+import com.sapo.mock.clothing.user.service.UserService;
 
 /**
  * Tích hợp với Spring Security để load UserDetails từ database theo username.
@@ -17,25 +18,24 @@ import java.util.Collections;
 @Component("userDetailsService")
 public class UserDetailsCustom implements UserDetailsService {
 
-    private final UserService userService;
+	private final UserService userService;
 
-    public UserDetailsCustom(UserService userService) {
-        this.userService = userService;
-    }
+	public UserDetailsCustom(UserService userService) {
+		this.userService = userService;
+	}
 
-    @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User systemUser = userService.getUserByUsername(username);
-        if (systemUser == null) {
-            throw new UsernameNotFoundException("Không tìm thấy tài khoản: " + username);
-        }
-        if (!systemUser.isActive()) {
-            throw new UsernameNotFoundException("Tài khoản đã bị khóa: " + username);
-        }
-        return new org.springframework.security.core.userdetails.User(
-            systemUser.getUsername(),
-            systemUser.getPasswordHash(),
-            Collections.singletonList(new SimpleGrantedAuthority(systemUser.getRole().name()))
-        );
-    }
+	@Override
+	public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+		User systemUser = userService.getUserByUsername(username);
+		if (systemUser == null) {
+			throw new UsernameNotFoundException("Không tìm thấy tài khoản: " + username);
+		}
+		if (!systemUser.isActive()) {
+			throw new UsernameNotFoundException("Tài khoản đã bị khóa: " + username);
+		}
+
+		return new org.springframework.security.core.userdetails.User(systemUser.getUsername(),
+				systemUser.getPasswordHash(),
+				Collections.singletonList(new SimpleGrantedAuthority(systemUser.getRole().name())));
+	}
 }

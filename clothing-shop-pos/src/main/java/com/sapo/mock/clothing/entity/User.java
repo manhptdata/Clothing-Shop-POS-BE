@@ -9,6 +9,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.sapo.mock.clothing.util.constant.RoleEnum;
 
 import jakarta.persistence.Column;
@@ -41,8 +42,9 @@ public class User implements UserDetails {
 	@Column(unique = true, nullable = false, length = 50)
 	private String username;
 
+	@JsonProperty("password")
 	@NotBlank(message = "password không được để trống")
-	@JsonIgnore
+//	@JsonIgnore
 	@Column(name = "password_hash", nullable = false)
 	private String passwordHash;
 
@@ -81,7 +83,18 @@ public class User implements UserDetails {
 		return Collections.singletonList(new SimpleGrantedAuthority(this.role.name()));
 	}
 
+	@JsonProperty("password")
+	public void setPassword(String password) {
+		this.passwordHash = password;
+	}
+
+	@JsonIgnore
+	public String getPasswordHash() {
+		return this.passwordHash;
+	}
+
 	@Override
+	@JsonIgnore
 	public String getPassword() {
 		return this.passwordHash;
 	}

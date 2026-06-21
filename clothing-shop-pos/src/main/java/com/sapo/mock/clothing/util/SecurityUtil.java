@@ -69,7 +69,9 @@ public class SecurityUtil {
 		Instant now = Instant.now();
 		JwtClaimsSet claims = JwtClaimsSet.builder().issuedAt(now)
 				.expiresAt(now.plus(accessTokenValidityInSeconds, ChronoUnit.SECONDS)).subject(username)
-				.claim("user", userInsideToken).build();
+				.claim("user", userInsideToken)
+				.claim("roles", dto.getUser().getRole())
+				.build();
 
 		return encodeJwt(claims);
 	}
@@ -87,7 +89,9 @@ public class SecurityUtil {
 		Instant now = Instant.now();
 		JwtClaimsSet claims = JwtClaimsSet.builder().issuedAt(now)
 				.expiresAt(now.plus(refreshTokenValidityInSeconds, ChronoUnit.SECONDS)).subject(username)
-				.claim("user", userInsideToken).build();
+				.claim("user", userInsideToken)
+				.claim("roles", dto.getUser().getRole())
+				.build();
 
 		return encodeJwt(claims);
 	}
