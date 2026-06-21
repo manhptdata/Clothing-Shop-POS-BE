@@ -31,8 +31,8 @@ public class SecurityConfiguration {
 	private String jwtBase64Secret;
 
 	private static final String[] WHITE_LIST = {
-        "/api/v1/auth/login",
-        "/api/v1/auth/refresh",
+        "/api/auth/login",
+        "/api/auth/refresh",
         "/swagger-ui/**",
         "/swagger-ui.html",
         "/v3/api-docs",
@@ -41,7 +41,7 @@ public class SecurityConfiguration {
         "/webjars/**",
         "/actuator/**",
         "/storage/**",
-        "api/v1/products",
+        "api/products",
         "/storage/**",
     };
 

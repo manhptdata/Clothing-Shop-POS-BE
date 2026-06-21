@@ -17,7 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v1/crm/customers")
+@RequestMapping("/api/crm/customers")
 @CrossOrigin(origins = "*") // Enable CORS for frontend requests.
 public class CustomerController {
 
@@ -26,7 +26,7 @@ public class CustomerController {
 
     /**
      * Customer lookup API using the shared RestResponse format.
-     * Endpoint: GET /api/v1/crm/customers/search?keyword=0987
+     * Endpoint: GET /api/crm/customers/search?keyword=0987
      */
     @GetMapping("/search")
     public ResponseEntity<RestResponse<Page<CustomerResponse>>> searchCustomers(
@@ -49,7 +49,7 @@ public class CustomerController {
 
     /**
      *Lọc danh sách khách hàng chuyên dụng duy nhất theo Tháng sinh
-     * Endpoint: GET /api/v1/crm/customers/birthday?month=06
+     * Endpoint: GET /api/crm/customers/birthday?month=06
      */
     @GetMapping("/birthday")
     public ResponseEntity<RestResponse<Page<CustomerResponse>>> getBirthdayCustomers(
@@ -74,7 +74,7 @@ public class CustomerController {
 
     /**
      * API Xem chi tiết khách hàng
-     * Endpoint: GET /api/v1/crm/customers/1
+     * Endpoint: GET /api/crm/customers/1
      */
     @GetMapping("/{id}")
     public ResponseEntity<RestResponse<CustomerResponse>> getCustomerDetail(@PathVariable Integer id) {
@@ -94,7 +94,7 @@ public class CustomerController {
 
     /**
      * API Thêm mới khách hàng tại quầy
-     * Endpoint: POST /api/v1/crm/customers
+     * Endpoint: POST /api/crm/customers
      */
     @PostMapping
     public ResponseEntity<RestResponse<CustomerResponse>> createCustomer(
@@ -115,7 +115,7 @@ public class CustomerController {
 
     /**
      * API Cập nhật thông tin khách hàng
-     * Endpoint: PUT /api/v1/crm/customers/11
+     * Endpoint: PUT /api/crm/customers/11
      */
     @PutMapping("/{id}")
     public ResponseEntity<RestResponse<CustomerResponse>> updateCustomer(
@@ -137,7 +137,7 @@ public class CustomerController {
 
     /**
      * API Khóa tài khoản khách hàng (Xóa mềm)
-     * Endpoint: PATCH /api/v1/crm/customers/11/deactivate
+     * Endpoint: PATCH /api/crm/customers/11/deactivate
      */
     @PatchMapping("/{id}/deactivate")
     public ResponseEntity<RestResponse<Void>> deactivateCustomer(@PathVariable Integer id) {
@@ -156,7 +156,7 @@ public class CustomerController {
     }
     /**
      * API Mở khóa tài khoản khách hàng (Kích hoạt lại)
-     * Endpoint: PATCH /api/v1/crm/customers/11/activate
+     * Endpoint: PATCH /api/crm/customers/11/activate
      */
     @PatchMapping("/{id}/activate")
     public ResponseEntity<RestResponse<Void>> activateCustomer(@PathVariable Integer id) {
@@ -176,7 +176,7 @@ public class CustomerController {
 
     /**
      * API: Xem lịch sử đơn hàng của 1 khách hàng cụ thể
-     * URL: GET /api/v1/crm/customers/{customerId}/orders?page=1&size=5
+     * URL: GET /api/crm/customers/{customerId}/orders?page=1&size=5
      */
     @GetMapping("/{customerId}/orders")
     public ResponseEntity<RestResponse<Page<OrderHistoryResponse>>> getCustomerOrders(

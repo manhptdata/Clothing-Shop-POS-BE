@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.*;
  * Controller xử lý xác thực: đăng nhập, đăng xuất, refresh token, lấy thông tin tài khoản.
  */
 @RestController
-@RequestMapping("/api/v1/auth")
+@RequestMapping("/api/auth")
 @Tag(name = "Auth", description = "Đăng nhập, đăng xuất, refresh token")
 public class AuthController {
 

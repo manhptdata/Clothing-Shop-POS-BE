@@ -20,7 +20,7 @@ public class PermissionInterceptorConfiguration implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         String[] whiteList = {
-            "/api/v1/auth/**",
+            "/api/auth/**",
             "/swagger-ui/**",
             "/swagger-ui.html",
             "/v3/api-docs",

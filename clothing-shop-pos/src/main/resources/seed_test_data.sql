@@ -15,6 +15,6 @@ INSERT INTO user (username, password_hash, full_name, phone, role, is_active, cr
 ('wh01',   '$2a$10$26IhRLEHb3p5ZGoxsLiyCevhGyJyxhgF/eGszXGQyJxFH.QQJD9ya', 'NV Kho',       '0903333333', 'ROLE_WH',   TRUE, NOW());
 
 -- =============================================
--- TEST: POST http://localhost:8080/api/v1/auth/login
+-- TEST: POST http://localhost:8080/api/auth/login
 -- Body: { "username": "sale01", "password": "123456" }
 -- =============================================

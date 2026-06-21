@@ -23,7 +23,7 @@ import com.sapo.mock.clothing.common.dto.response.RestResponse;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("api/v1/categories")
+@RequestMapping("api/categories")
 @RequiredArgsConstructor
 public class CategoryController {
 

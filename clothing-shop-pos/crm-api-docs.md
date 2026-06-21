@@ -1,6 +1,6 @@
 # CRM Customer – Tài liệu API
 
-> Base URL: `http://localhost:8080/api/v1/crm`
+> Base URL: `http://localhost:8080/api/crm`
 
 ---
 
@@ -12,7 +12,7 @@
 ### 1.1 Tìm kiếm khách hàng
 
 ```
-GET /api/v1/crm/customers/search?keyword=&page=0&size=10
+GET /api/crm/customers/search?keyword=&page=0&size=10
 ```
 
 - Tìm theo **tên** hoặc **số điện thoại** (không phân biệt hoa thường)
@@ -32,7 +32,7 @@ GET /api/v1/crm/customers/search?keyword=&page=0&size=10
 ### 1.2 Xem chi tiết khách hàng
 
 ```
-GET /api/v1/crm/customers/{id}
+GET /api/crm/customers/{id}
 ```
 
 ---
@@ -40,7 +40,7 @@ GET /api/v1/crm/customers/{id}
 ### 1.3 Thêm mới khách hàng
 
 ```
-POST /api/v1/crm/customers
+POST /api/crm/customers
 ```
 
 **Body (JSON):**
@@ -63,7 +63,7 @@ POST /api/v1/crm/customers
 ### 1.4 Cập nhật thông tin khách hàng
 
 ```
-PUT /api/v1/crm/customers/{id}
+PUT /api/crm/customers/{id}
 ```
 
 **Body:** Tương tự tạo mới, thêm trường `status` (ACTIVE / INACTIVE)
@@ -73,7 +73,7 @@ PUT /api/v1/crm/customers/{id}
 ### 1.5 Khóa tài khoản khách hàng (xóa mềm)
 
 ```
-PATCH /api/v1/crm/customers/{id}/deactivate
+PATCH /api/crm/customers/{id}/deactivate
 ```
 
 - Chuyển `status` → `INACTIVE`, **không xóa khỏi DB**
@@ -83,7 +83,7 @@ PATCH /api/v1/crm/customers/{id}/deactivate
 ### 1.6 Mở khóa tài khoản khách hàng
 
 ```
-PATCH /api/v1/crm/customers/{id}/activate
+PATCH /api/crm/customers/{id}/activate
 ```
 
 - Chuyển `status` → `ACTIVE`
@@ -98,7 +98,7 @@ PATCH /api/v1/crm/customers/{id}/activate
 ### 2.1 Danh sách nhóm có phân trang
 
 ```
-GET /api/v1/crm/customer-groups?page=0&size=10
+GET /api/crm/customer-groups?page=0&size=10
 ```
 
 - Sắp xếp theo `id` tăng dần
@@ -109,7 +109,7 @@ GET /api/v1/crm/customer-groups?page=0&size=10
 ### 2.2 Tìm kiếm nhóm khách hàng
 
 ```
-GET /api/v1/crm/customer-groups/search?keyword=khu vực&page=0&size=10
+GET /api/crm/customer-groups/search?keyword=khu vực&page=0&size=10
 ```
 
 - Chỉ trả về nhóm có status **ACTIVE**
@@ -122,7 +122,7 @@ GET /api/v1/crm/customer-groups/search?keyword=khu vực&page=0&size=10
 ### 2.3 Xem chi tiết một nhóm
 
 ```
-GET /api/v1/crm/customer-groups/{id}
+GET /api/crm/customer-groups/{id}
 ```
 
 - Trả về thông tin nhóm kèm `totalCustomers`
@@ -132,7 +132,7 @@ GET /api/v1/crm/customer-groups/{id}
 ### 2.4 Tạo mới nhóm khách hàng
 
 ```
-POST /api/v1/crm/customer-groups
+POST /api/crm/customer-groups
 ```
 
 **Body (JSON):**
@@ -152,7 +152,7 @@ POST /api/v1/crm/customer-groups
 ### 2.5 Gán khách hàng vào nhóm (kèm cập nhật thông tin)
 
 ```
-PUT /api/v1/crm/customer-groups/{customerId}/assign
+PUT /api/crm/customer-groups/{customerId}/assign
 ```
 **Body (JSON):** Gửi đầy đủ thông tin khách hàng + `customerGroupId`
 
@@ -178,7 +178,7 @@ PUT /api/v1/crm/customer-groups/{customerId}/assign
 
 
 ```
-PATCH /api/v1/crm/customer-groups/{customerId}/assign-group
+PATCH /api/crm/customer-groups/{customerId}/assign-group
 ```
 
 **Body (JSON):** Chỉ cần gửi mỗi `customerGroupId`
@@ -200,7 +200,7 @@ Rút khỏi nhóm:
 ### 2.7 Xem danh sách thành viên của một nhóm
 
 ```
-GET /api/v1/crm/customer-groups/{groupId}/members?page=0&size=10
+GET /api/crm/customer-groups/{groupId}/members?page=0&size=10
 ```
 
 - Chỉ trả về khách hàng có status **ACTIVE**

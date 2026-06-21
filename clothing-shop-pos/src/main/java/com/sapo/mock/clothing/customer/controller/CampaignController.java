@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.Instant;
 
 @RestController
-@RequestMapping("/api/v1/crm/campaigns")
+@RequestMapping("/api/crm/campaigns")
 @CrossOrigin(origins = "*")
 public class CampaignController {
 
@@ -74,7 +74,7 @@ public class CampaignController {
 
     /**
      * API: Xem TOÀN BỘ danh sách lịch sử chăm sóc khách hàng của cửa hàng
-     * Endpoint: GET /api/v1/crm/campaigns/care-logs
+     * Endpoint: GET /api/crm/campaigns/care-logs
      */
     @GetMapping("/care-logs")
     public ResponseEntity<RestResponse<Page<CareLogListResponse>>> getAllCareLogs(
@@ -92,7 +92,7 @@ public class CampaignController {
 
     /**
      * API: Xem danh sách lịch sử chăm sóc của RIÊNG 1 khách hàng (Dùng cho màn hình chi tiết khách)
-     * Endpoint: GET /api/v1/crm/campaigns/customers/{customerId}/care-logs
+     * Endpoint: GET /api/crm/campaigns/customers/{customerId}/care-logs
      */
     @GetMapping("/customers/{customerId}/care-logs")
     public ResponseEntity<RestResponse<Page<CareLogResponse>>> getCustomerCareLogs(
@@ -111,7 +111,7 @@ public class CampaignController {
 
     /**
      * API: Ghi nhận lịch sử sau mỗi lần liên hệ khách hàng (Tạo mới nhật ký)
-     * Endpoint: POST /api/v1/crm/campaigns/care-logs
+     * Endpoint: POST /api/crm/campaigns/care-logs
      */
     @PostMapping("/care-logs")
     public ResponseEntity<RestResponse<Void>> createCareLog(
@@ -135,7 +135,7 @@ public class CampaignController {
 
     /**
      * API: Cập nhật nội dung chăm sóc (Chỉnh sửa nhật ký cũ)
-     * Endpoint: PUT /api/v1/crm/campaigns/care-logs/{id}
+     * Endpoint: PUT /api/crm/campaigns/care-logs/{id}
      */
     @PutMapping("/care-logs/{id}")
     public ResponseEntity<RestResponse<Void>> updateCareLog(
@@ -157,7 +157,7 @@ public class CampaignController {
 
     /**
      * API: Xóa lịch sử chăm sóc (Xóa nhật ký cũ)
-     * Endpoint: DELETE /api/v1/crm/campaigns/care-logs/{id}
+     * Endpoint: DELETE /api/crm/campaigns/care-logs/{id}
      */
     @DeleteMapping("/care-logs/{id}")
     public ResponseEntity<RestResponse<Void>> deleteCareLog(@PathVariable Integer id) {
@@ -176,7 +176,7 @@ public class CampaignController {
 
     /**
      * API: Tìm kiếm và lọc nâng cao lịch sử chăm sóc khách hàng
-     * Endpoint: GET /api/v1/crm/campaigns/care-logs/search
+     * Endpoint: GET /api/crm/campaigns/care-logs/search
      */
     @GetMapping("/care-logs/search")
     public ResponseEntity<RestResponse<Page<CareLogListResponse>>> searchCareLogsByPhone(
@@ -204,7 +204,7 @@ public class CampaignController {
 
     /**
      * API: Xem CHI TIẾT thông tin một bản ghi lịch sử chăm sóc
-     * Endpoint: GET /api/v1/crm/campaigns/care-logs/{id}
+     * Endpoint: GET /api/crm/campaigns/care-logs/{id}
      */
     @GetMapping("/care-logs/{id}")
     public ResponseEntity<RestResponse<CareLogResponse>> getCareLogDetail(@PathVariable Integer id) {

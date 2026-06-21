@@ -19,7 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v1/crm/customer-groups")
+@RequestMapping("/api/crm/customer-groups")
 @CrossOrigin(origins = "*")
 public class CustomerGroupController {
 
@@ -36,7 +36,7 @@ public class CustomerGroupController {
 
     /**
      * API: Lấy TẤT CẢ các nhóm khách hàng hiện có (Không phân trang)
-     * Endpoint: GET /api/v1/crm/customer-groups/all
+     * Endpoint: GET /api/crm/customer-groups/all
      */
     @GetMapping("")
     public ResponseEntity<RestResponse<Page<CustomerGroupResponse>>> getGroupsWithPage(
@@ -58,7 +58,7 @@ public class CustomerGroupController {
 
     /**
      * API 1: Xem danh sách phân trang và tìm kiếm nhóm khách hàng
-     * Endpoint: GET /api/v1/crm/customer-groups/search?keyword=Vùng A
+     * Endpoint: GET /api/crm/customer-groups/search?keyword=Vùng A
      */
     @GetMapping("/search")
     public ResponseEntity<RestResponse<Page<CustomerGroupResponse>>> searchGroups(
@@ -80,7 +80,7 @@ public class CustomerGroupController {
 
     /**
      * API: Xem chi tiết thông tin cấu hình một nhóm khách hàng
-     * Endpoint: GET /api/v1/crm/customer-groups/{id}
+     * Endpoint: GET /api/crm/customer-groups/{id}
      */
     @GetMapping("/{id}")
     public ResponseEntity<RestResponse<CustomerGroupResponse>> getGroupDetail(@PathVariable Integer id) {
@@ -106,7 +106,7 @@ public class CustomerGroupController {
 
     /**
      * API: Xem danh sách thành viên (khách hàng) của một nhóm cụ thể
-     * Endpoint: GET /api/v1/crm/customer-groups/{groupId}/members?page=0&size=10
+     * Endpoint: GET /api/crm/customer-groups/{groupId}/members?page=0&size=10
      */
     @GetMapping("/{groupId}/members")
     public ResponseEntity<RestResponse<Page<CustomerResponse>>> getGroupMembers(
@@ -135,7 +135,7 @@ public class CustomerGroupController {
 
     /**
      * API Giả lập đơn hàng hoàn thành phục vụ test luồng tự động CRM
-     * Endpoint: POST /api/v1/crm/complete
+     * Endpoint: POST /api/crm/complete
      */
     @PostMapping("/complete")
     public ResponseEntity<String> mockCompleteOrder(@RequestBody MockOrderRequest request) {
