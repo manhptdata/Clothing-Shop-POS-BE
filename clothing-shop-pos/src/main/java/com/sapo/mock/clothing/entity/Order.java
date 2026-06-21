@@ -60,6 +60,15 @@ public class Order {
 	@Column(name = "change_amount", nullable = false, precision = 15, scale = 2)
 	private BigDecimal changeAmount;
 
+	@Column(name = "points_used", nullable = false)
+	private Integer pointsUsed = 0;
+
+	@Column(name = "points_earned", nullable = false)
+	private Integer pointsEarned = 0;
+
+	@Column(name = "discount_from_points", nullable = false, precision = 15, scale = 2)
+	private BigDecimal discountFromPoints = BigDecimal.ZERO;
+
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
 	private OrderStatus status = OrderStatus.COMPLETED;

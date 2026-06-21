@@ -13,6 +13,8 @@ import com.sapo.mock.clothing.user.repository.UserRepository;
 import com.sapo.mock.clothing.util.constant.OrderStatus;
 import com.sapo.mock.clothing.customer.repository.CustomerRepository;
 import com.sapo.mock.clothing.common.dto.response.ResultPaginationDTO;
+import com.sapo.mock.clothing.customer.repository.PointHistoryRepository;
+import com.sapo.mock.clothing.util.constant.PointConstant;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,9 +43,8 @@ public class OrderService {
     private final ProductVariantRepository productVariantRepository;
     private final UserRepository userRepository;
     private final CustomerRepository customerRepository;
-
-    @Autowired
-    private ApplicationEventPublisher eventPublisher;
+    private final PointHistoryRepository pointHistoryRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public ResOrderDTO createOrder(ReqCreateOrderDTO dto, String username) {
@@ -106,6 +107,21 @@ public class OrderService {
             lineItems.add(lineItem);
         }
 
+        if (dto.getPointsToUse() != null && dto.getPointsToUse() > 0) {
+            if (customer.getRewardPoints() < dto.getPointsToUse()) {
+                throw new BadRequestException("Khách hàng không đủ điểm. Điểm hiện tại: " + customer.getRewardPoints());
+            }
+            
+            BigDecimal discount = BigDecimal.valueOf(dto.getPointsToUse()).multiply(PointConstant.REDEEM_RATE);
+            if (discount.compareTo(totalAmount) > 0) {
+                discount = totalAmount; // Không giảm quá tổng tiền
+            }
+            
+            order.setPointsUsed(dto.getPointsToUse());
+            order.setDiscountFromPoints(discount);
+            totalAmount = totalAmount.subtract(discount);
+        }
+
         if (dto.getPaidAmount().compareTo(totalAmount) < 0) {
             throw new BadRequestException(
                     "Số tiền khách đưa (" + dto.getPaidAmount() + ") không đủ để thanh toán đơn hàng (" + totalAmount + ")");
@@ -114,10 +130,38 @@ public class OrderService {
         order.setTotalAmount(totalAmount);
         order.setChangeAmount(dto.getPaidAmount().subtract(totalAmount));
 
+        // Tích điểm cho đơn hàng
+        int earnedPoints = totalAmount.divideToIntegralValue(PointConstant.EARN_RATE).intValue();
+        order.setPointsEarned(earnedPoints);
+
         this.deductProductStock(dto.getItems());
 
         Order savedOrder = orderRepository.save(order);
         orderLineItemRepository.saveAll(lineItems);
+
+        // Lưu lịch sử và cập nhật điểm khách hàng
+        if (order.getPointsUsed() > 0) {
+            customer.setRewardPoints(customer.getRewardPoints() - order.getPointsUsed());
+            PointHistory phUse = new PointHistory();
+            phUse.setCustomerId(customer.getId());
+            phUse.setOrderId(savedOrder.getId());
+            phUse.setPointsChange(-order.getPointsUsed());
+            phUse.setType(PointConstant.TYPE_REDEEM);
+            phUse.setDescription("Sử dụng điểm cho đơn hàng " + savedOrder.getOrderNumber());
+            pointHistoryRepository.save(phUse);
+        }
+        
+        if (order.getPointsEarned() > 0) {
+            customer.setRewardPoints(customer.getRewardPoints() + order.getPointsEarned());
+            PointHistory phEarn = new PointHistory();
+            phEarn.setCustomerId(customer.getId());
+            phEarn.setOrderId(savedOrder.getId());
+            phEarn.setPointsChange(order.getPointsEarned());
+            phEarn.setType(PointConstant.TYPE_EARN);
+            phEarn.setDescription("Tích điểm từ đơn hàng " + savedOrder.getOrderNumber());
+            pointHistoryRepository.save(phEarn);
+        }
+        customerRepository.save(customer);
 
         eventPublisher.publishEvent(new OrderCompletedEvent(savedOrder.getCustomerId(), savedOrder.getTotalAmount()));
         return mapToResOrderDTO(savedOrder, lineItems);
@@ -176,6 +220,32 @@ public class OrderService {
         order.setStatus(OrderStatus.CANCELLED);
         Order savedOrder = orderRepository.save(order);
 
+        Customer customer = customerRepository.findById(order.getCustomerId())
+                .orElseThrow(() -> new ResourceNotFoundException("Khách hàng không tồn tại"));
+
+        // Hoàn trả / trừ lại điểm
+        if (order.getPointsUsed() > 0) {
+            customer.setRewardPoints(customer.getRewardPoints() + order.getPointsUsed());
+            PointHistory phRefund = new PointHistory();
+            phRefund.setCustomerId(customer.getId());
+            phRefund.setOrderId(savedOrder.getId());
+            phRefund.setPointsChange(order.getPointsUsed());
+            phRefund.setType(PointConstant.TYPE_REFUND);
+            phRefund.setDescription("Hoàn điểm do hủy đơn hàng " + savedOrder.getOrderNumber());
+            pointHistoryRepository.save(phRefund);
+        }
+        if (order.getPointsEarned() > 0) {
+            customer.setRewardPoints(customer.getRewardPoints() - order.getPointsEarned());
+            PointHistory phRevertEarn = new PointHistory();
+            phRevertEarn.setCustomerId(customer.getId());
+            phRevertEarn.setOrderId(savedOrder.getId());
+            phRevertEarn.setPointsChange(-order.getPointsEarned());
+            phRevertEarn.setType(PointConstant.TYPE_REFUND);
+            phRevertEarn.setDescription("Trừ điểm tích lũy do hủy đơn hàng " + savedOrder.getOrderNumber());
+            pointHistoryRepository.save(phRevertEarn);
+        }
+        customerRepository.save(customer);
+
         List<OrderLineItem> items = orderLineItemRepository.findByOrderId(id);
         for (OrderLineItem item : items) {
             ProductVariant variant = productVariantRepository.findById(item.getVariantId())
@@ -224,6 +294,9 @@ public class OrderService {
                 .totalAmount(savedOrder.getTotalAmount())
                 .paidAmount(savedOrder.getPaidAmount())
                 .changeAmount(savedOrder.getChangeAmount())
+                .pointsUsed(savedOrder.getPointsUsed())
+                .pointsEarned(savedOrder.getPointsEarned())
+                .discountFromPoints(savedOrder.getDiscountFromPoints())
                 .status(savedOrder.getStatus())
                 .isPrinted(savedOrder.isPrinted())
                 .note(savedOrder.getNote())

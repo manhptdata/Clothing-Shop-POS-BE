@@ -61,6 +61,9 @@ public class Customer {
     private Instant updatedAt;
 
     private BigDecimal totalSpent; // Tổng chi tiêu của khách hàng
+    
+    @Column(name = "reward_points", nullable = false)
+    private Integer rewardPoints = 0; // Điểm thưởng tích lũy
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")
