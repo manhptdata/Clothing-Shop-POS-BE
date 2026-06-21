@@ -10,6 +10,7 @@ import com.sapo.mock.clothing.order.repository.OrderRepository;
 import com.sapo.mock.clothing.product.repository.ProductVariantRepository;
 import com.sapo.mock.clothing.user.repository.UserRepository;
 import com.sapo.mock.clothing.customer.repository.CustomerRepository;
+import com.sapo.mock.clothing.customer.repository.PointHistoryRepository;
 import com.sapo.mock.clothing.util.constant.OrderStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,6 +49,10 @@ public class OrderServiceTest {
     private UserRepository userRepository;
     @Mock
     private CustomerRepository customerRepository;
+    @Mock
+    private PointHistoryRepository pointHistoryRepository;
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private OrderService orderService;
@@ -67,6 +72,7 @@ public class OrderServiceTest {
         mockCustomer = new Customer();
         mockCustomer.setId(1);
         mockCustomer.setFullName("Nguyễn Văn A");
+        mockCustomer.setRewardPoints(1000);
 
         mockProduct = new Product();
         mockProduct.setId(1);
@@ -123,9 +129,12 @@ public class OrderServiceTest {
         assertEquals(new BigDecimal("200000"), result.getTotalAmount());
         assertFalse(result.isPrinted());
         assertEquals(48, mockVariant.getQuantity()); // 50 - 2
+        assertEquals(1200, mockCustomer.getRewardPoints()); // 1000 + 200 points (200k / 1000)
 
         verify(orderRepository, times(1)).save(any(Order.class));
         verify(orderLineItemRepository, times(1)).saveAll(anyList());
+        verify(pointHistoryRepository, times(1)).save(any(PointHistory.class));
+        verify(customerRepository, times(1)).save(mockCustomer);
     }
 
     @Test
@@ -213,7 +222,9 @@ public class OrderServiceTest {
     void cancelOrder_Success() {
         Order order = new Order();
         order.setId(100);
+        order.setCustomerId(1);
         order.setStatus(OrderStatus.COMPLETED);
+        order.setPointsEarned(200);
 
         OrderLineItem item = new OrderLineItem();
         item.setVariantId(10); // Matches mockVariant.getId()
@@ -223,6 +234,7 @@ public class OrderServiceTest {
 
         when(orderRepository.findById(100)).thenReturn(Optional.of(order));
         when(orderRepository.save(any(Order.class))).thenReturn(order);
+        when(customerRepository.findById(1)).thenReturn(Optional.of(mockCustomer));
         when(orderLineItemRepository.findByOrderId(100)).thenReturn(Collections.singletonList(item));
         when(productVariantRepository.findById(10)).thenReturn(Optional.of(mockVariant));
 
@@ -230,7 +242,10 @@ public class OrderServiceTest {
 
         assertEquals(OrderStatus.CANCELLED, order.getStatus());
         assertEquals(15, mockVariant.getQuantity()); // 10 + 5 returned
+        assertEquals(800, mockCustomer.getRewardPoints()); // 1000 - 200 reverted
         verify(productVariantRepository, times(1)).save(mockVariant);
+        verify(pointHistoryRepository, times(1)).save(any(PointHistory.class));
+        verify(customerRepository, times(1)).save(mockCustomer);
     }
 
     @Test
@@ -261,5 +276,41 @@ public class OrderServiceTest {
         assertTrue(order.isPrinted());
         assertTrue(result.isPrinted());
         verify(orderRepository, times(1)).save(order);
+    }
+
+    @Test
+    void createOrder_WithPointsToUse_Success() {
+        mockReqDto.setPointsToUse(50); // Mua đơn 200k, dùng 50 điểm = giảm 50k
+        mockReqDto.setPaidAmount(new BigDecimal("150000"));
+
+        when(userRepository.findByUsername("testuser")).thenReturn(mockUser);
+        when(customerRepository.findById(1)).thenReturn(Optional.of(mockCustomer));
+        when(productVariantRepository.findById(10)).thenReturn(Optional.of(mockVariant));
+        when(orderRepository.countByCreatedAtAfter(any())).thenReturn(0L);
+
+        Order savedOrder = new Order();
+        savedOrder.setId(100);
+        savedOrder.setOrderNumber("HD-20230101-002");
+        savedOrder.setCustomerId(1);
+        savedOrder.setCustomerName("Nguyễn Văn A");
+        savedOrder.setCreatedBy(1);
+        savedOrder.setCreatedByUsername("testuser");
+        savedOrder.setTotalAmount(new BigDecimal("150000")); // 200k - 50k
+        savedOrder.setPaidAmount(new BigDecimal("150000"));
+        savedOrder.setChangeAmount(BigDecimal.ZERO);
+        savedOrder.setPointsUsed(50);
+        savedOrder.setPointsEarned(150); // 150k / 1000 = 150 points
+        savedOrder.setStatus(OrderStatus.COMPLETED);
+
+        when(orderRepository.save(any(Order.class))).thenReturn(savedOrder);
+
+        ResOrderDTO result = orderService.createOrder(mockReqDto, "testuser");
+
+        assertNotNull(result);
+        assertEquals(new BigDecimal("150000"), result.getTotalAmount());
+        assertEquals(1100, mockCustomer.getRewardPoints()); // 1000 - 50 used + 150 earned
+
+        verify(pointHistoryRepository, times(2)).save(any(PointHistory.class));
+        verify(customerRepository, times(1)).save(mockCustomer);
     }
 }

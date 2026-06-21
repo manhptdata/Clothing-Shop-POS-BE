@@ -20,6 +20,8 @@ public class ReqCreateOrderDTO {
 
     private String note;
 
+    private Integer pointsToUse = 0; // Số điểm muốn sử dụng trong đơn hàng này
+
     private List<OrderItemDTO> items;
 
     @Getter

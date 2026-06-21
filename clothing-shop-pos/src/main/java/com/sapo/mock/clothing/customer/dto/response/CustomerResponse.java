@@ -24,6 +24,7 @@ public class CustomerResponse {
     private String note;
     private CustomerStatusEnum status;
     private Instant createdAt;
+    private Integer rewardPoints;
 
 
     // Hiện tại chưa làm tính năng điểm thì gán mặc định luôn ở đây

@@ -28,6 +28,10 @@ public class ResOrderDTO {
     private BigDecimal paidAmount;
     private BigDecimal changeAmount;
 
+    private Integer pointsUsed;
+    private Integer pointsEarned;
+    private BigDecimal discountFromPoints;
+
     private OrderStatus status;
     private boolean isPrinted;
     private String note;

@@ -1,4 +1,4 @@
-CREATE DATABASE clothing_shop_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS clothing_shop_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- =============================================
 -- Chạy SAU KHI đã tạo DB bằng script chính
