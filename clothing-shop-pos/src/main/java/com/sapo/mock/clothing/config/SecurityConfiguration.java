@@ -30,23 +30,35 @@ public class SecurityConfiguration {
 	@Value("${sapo.jwt.base64-secret}")
 	private String jwtBase64Secret;
 
-	private static final String[] WHITE_LIST = { "/api/v1/auth/login", "/api/v1/auth/refresh", "/swagger-ui/**",
-			"/swagger-ui.html", "/v3/api-docs", "/v3/api-docs/**", "/swagger-resources/**", "/webjars/**",
-			"/actuator/**", "/storage/**", "/api/v1/crm/customers/**", // customer
-			"/api/v1/crm/customer-groups/**", // customer group
-			"api/v1/products", "/storage/**", "/api/v1/crm/customers/**", "/api/v1/crm/campaigns/**" // campaign
-	};
+	private static final String[] WHITE_LIST = {
+        "/api/v1/auth/login",
+        "/api/v1/auth/refresh",
+        "/swagger-ui/**",
+        "/swagger-ui.html",
+        "/v3/api-docs",
+        "/v3/api-docs/**",
+        "/swagger-resources/**",
+        "/webjars/**",
+        "/actuator/**",
+        "/storage/**",
+        "api/v1/products",
+        "/storage/**",
+    };
 
 	@Bean
 	public PasswordEncoder passwordEncoder() {
 		return new BCryptPasswordEncoder();
 	}
 
+
 	@Bean
 	public org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter jwtAuthenticationConverter() {
 		org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter grantedAuthoritiesConverter = new org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter();
 		grantedAuthoritiesConverter.setAuthorityPrefix("");
 		grantedAuthoritiesConverter.setAuthoritiesClaimName("roles");
+
+    
+
 
 		org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter jwtAuthenticationConverter = new org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter();
 		jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(grantedAuthoritiesConverter);

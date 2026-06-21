@@ -1,5 +1,6 @@
 package com.sapo.mock.clothing.order.service;
 
+import com.sapo.mock.clothing.customer.dto.event.OrderCompletedEvent;
 import com.sapo.mock.clothing.entity.*;
 import com.sapo.mock.clothing.exception.BadRequestException;
 import com.sapo.mock.clothing.exception.ResourceNotFoundException;
@@ -14,6 +15,8 @@ import com.sapo.mock.clothing.customer.repository.CustomerRepository;
 import com.sapo.mock.clothing.common.dto.response.ResultPaginationDTO;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -38,6 +41,9 @@ public class OrderService {
     private final ProductVariantRepository productVariantRepository;
     private final UserRepository userRepository;
     private final CustomerRepository customerRepository;
+
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public ResOrderDTO createOrder(ReqCreateOrderDTO dto, String username) {
@@ -113,6 +119,7 @@ public class OrderService {
         Order savedOrder = orderRepository.save(order);
         orderLineItemRepository.saveAll(lineItems);
 
+        eventPublisher.publishEvent(new OrderCompletedEvent(savedOrder.getCustomerId(), savedOrder.getTotalAmount()));
         return mapToResOrderDTO(savedOrder, lineItems);
     }
 

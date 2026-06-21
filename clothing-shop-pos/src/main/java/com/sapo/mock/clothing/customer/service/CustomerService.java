@@ -10,6 +10,9 @@ public interface CustomerService {
     // Search ACTIVE customers by name or phone number.
     Page<CustomerResponse> searchCustomers(String keyword, Pageable pageable);
 
+    // Search ACTIVE customers by birth month (format: "MM").
+    Page<CustomerResponse> searchByBirthMonth(String month, Pageable pageable);
+
     // Retrieve customer details by ID.
     CustomerResponse getCustomerById(Integer id);
 

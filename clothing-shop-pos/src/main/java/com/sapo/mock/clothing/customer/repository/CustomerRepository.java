@@ -9,6 +9,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+
 @Repository
 public interface CustomerRepository extends JpaRepository<Customer, Integer>, JpaSpecificationExecutor<Customer> {
     // Search ACTIVE customers by keyword (case-insensitive).
@@ -17,6 +19,18 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer>, Jp
     Page<Customer> searchActiveCustomers(@Param("keyword") String keyword, Pageable pageable);
 
 
+    @Query(value = "SELECT c.* FROM customer c " +
+            "LEFT JOIN customer_group cg ON c.customer_group_id = cg.id " +
+            "WHERE c.status = 'ACTIVE' AND (" +
+            "LPAD(MONTH(c.date_of_birth), 2, '0') = :month " +
+            "OR CAST(MONTH(c.date_of_birth) AS CHAR) = :month)",
+
+            countQuery = "SELECT COUNT(*) FROM customer c WHERE c.status = 'ACTIVE' AND (" +
+                    "LPAD(MONTH(c.date_of_birth), 2, '0') = :month " +
+                    "OR CAST(MONTH(c.date_of_birth) AS CHAR) = :month)",
+            nativeQuery = true)
+    Page<Customer> searchByBirthMonth(@Param("month") String month, Pageable pageable);
+
     // Used for automatic phone number duplicate validation.
     boolean existsByPhone(String phone);
 
@@ -24,6 +38,19 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer>, Jp
     boolean existsByPhoneAndIdNot(String phone, Integer id);
 
     // detail customer by id, only if ACTIVE
-    @Query("SELECT c FROM Customer c WHERE c.customerGroup.id = :groupId AND c.status = com.sapo.mock.clothing.util.constant.CustomerStatusEnum.ACTIVE")
-    Page<Customer> findCustomersByGroupId(@Param("groupId") Integer groupId, Pageable pageable);
+    @Query("SELECT c FROM Customer c " +
+            "LEFT JOIN FETCH c.customerGroup " +
+            "WHERE c.customerGroup.id = :groupId " +
+            "AND c.status = com.sapo.mock.clothing.util.constant.CustomerStatusEnum.ACTIVE")
+    Page<Customer> findByCustomerGroupId(@Param("groupId") Integer groupId, Pageable pageable);
+
+
+    // Thêm câu query này vào file CustomerRepository.java hiện tại của bạn
+    @Query("SELECT c FROM Customer c WHERE c.status = :status " +
+            "AND c.dateOfBirth IS NOT NULL " +
+            "AND FUNCTION('MONTH', c.dateOfBirth) = :month")
+    List<Customer> findActiveCustomersByBirthMonth(
+            @Param("month") int month,
+            @Param("status") com.sapo.mock.clothing.util.constant.CustomerStatusEnum status
+    );
 }

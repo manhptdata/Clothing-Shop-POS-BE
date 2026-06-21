@@ -2,6 +2,7 @@ package com.sapo.mock.clothing.customer.dto.response;
 
 import com.sapo.mock.clothing.util.constant.CustomerStatusEnum;
 import com.sapo.mock.clothing.util.constant.GenderEnum;
+import com.sapo.mock.clothing.util.constant.RankCodeEnum;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -37,6 +38,7 @@ public class CustomerResponse {
     public static class GroupInfo {
         private Integer id;
         private String name;
+        private RankCodeEnum code;
     }
 
 

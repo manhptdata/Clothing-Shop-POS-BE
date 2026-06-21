@@ -1,10 +1,13 @@
 package com.sapo.mock.clothing.entity;
 
 import com.sapo.mock.clothing.util.constant.CustomerStatusEnum;
+import com.sapo.mock.clothing.util.constant.RankCodeEnum;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+
+import java.math.BigDecimal;
 import java.time.Instant;
 
 @Getter
@@ -36,6 +39,13 @@ public class CustomerGroup {
 
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "code", length = 50, nullable = false)
+    private RankCodeEnum code;
+
+    private BigDecimal minSpending; // Chi tiêu tối thiểu
+    private BigDecimal maxSpending; // Chi tiêu tối đa
 
     // Tự động sinh thời gian khi tạo mới nhóm
     @PrePersist

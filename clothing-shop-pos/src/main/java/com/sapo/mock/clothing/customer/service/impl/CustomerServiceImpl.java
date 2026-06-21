@@ -26,6 +26,12 @@ public class CustomerServiceImpl implements CustomerService {
         Page<Customer> customers = customerRepository.searchActiveCustomers(keyword, pageable);
         return customers.map(this::convertToResponse);
     }
+    @Override
+    public Page<CustomerResponse> searchByBirthMonth(String month, Pageable pageable) {
+        // Gọi hàm Repo số 2 chuyên chọc vào tháng của date_of_birth
+        Page<Customer> customers = customerRepository.searchByBirthMonth(month, pageable);
+        return customers.map(this::convertToResponse);
+    }
 
     private CustomerResponse convertToResponse(Customer customer) {
         CustomerResponse response = new CustomerResponse();
@@ -38,6 +44,15 @@ public class CustomerServiceImpl implements CustomerService {
         response.setNote(customer.getNote());
         response.setStatus(customer.getStatus());
         response.setCreatedAt(customer.getCreatedAt());
+
+        if (customer.getCustomerGroup() != null) {
+            CustomerResponse.GroupInfo groupInfo = new CustomerResponse.GroupInfo();
+            groupInfo.setId(customer.getCustomerGroup().getId());
+            groupInfo.setName(customer.getCustomerGroup().getName());
+            groupInfo.setCode(customer.getCustomerGroup().getCode());
+            response.setCustomerGroup(groupInfo);
+        }
+
         return response;
     }
 
@@ -127,12 +142,34 @@ public class CustomerServiceImpl implements CustomerService {
     // Get customers by group ID, only ACTIVE ones.
     @Override
     public Page<CustomerResponse> getCustomersByGroupId(Integer groupId, Pageable pageable) {
-        Page<Customer> customers = customerRepository.findCustomersByGroupId(groupId, pageable);
+        Page<Customer> customers = customerRepository.findByCustomerGroupId(groupId, pageable);
 
-        return customers.map(this::convertToResponse);
+        // Map danh sách Entity khách hàng sang danh sách DTO để trả về cho Frontend
+        return customers.map(this::convertToCustomerResponse);
     }
 
+    // Hàm Helper chuyển đổi dữ liệu Khách hàng sang DTO
+    private CustomerResponse convertToCustomerResponse(Customer customer) {
+        CustomerResponse res = new CustomerResponse();
+        res.setId(customer.getId());
+        res.setFullName(customer.getFullName());
+        res.setPhone(customer.getPhone());
+        res.setDateOfBirth(customer.getDateOfBirth());
+        res.setGender(customer.getGender());
+        res.setStatus(customer.getStatus());
+        res.setAddress(customer.getAddress());
+        res.setNote(customer.getNote());
+        res.setCreatedAt(customer.getCreatedAt());
 
+        if (customer.getCustomerGroup() != null) {
+            CustomerResponse.GroupInfo groupInfo = new CustomerResponse.GroupInfo();
+            groupInfo.setId(customer.getCustomerGroup().getId());
+            groupInfo.setName(customer.getCustomerGroup().getName());
+            groupInfo.setCode(customer.getCustomerGroup().getCode());
+            res.setCustomerGroup(groupInfo);
+        }
+        return res;
+    }
 
 
 

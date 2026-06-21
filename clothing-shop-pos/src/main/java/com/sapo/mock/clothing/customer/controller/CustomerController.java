@@ -47,6 +47,31 @@ public class CustomerController {
     }
 
     /**
+     *Lọc danh sách khách hàng chuyên dụng duy nhất theo Tháng sinh
+     * Endpoint: GET /api/v1/crm/customers/birthday?month=06
+     */
+    @GetMapping("/birthday")
+    public ResponseEntity<RestResponse<Page<CustomerResponse>>> getBirthdayCustomers(
+            @RequestParam(required = false, defaultValue = "") String month,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        int targetPage = (page <= 0) ? 1 : page;
+        Pageable pageable = PageRequest.of(targetPage - 1, size, Sort.by("created_at").descending());
+
+
+        Page<CustomerResponse> result = customerService.searchByBirthMonth(month, pageable);
+
+        RestResponse<Page<CustomerResponse>> response = new RestResponse<>();
+        response.setStatusCode(HttpStatus.OK.value());
+        response.setError(null);
+        response.setMessage("Lọc danh sách khách hàng theo tháng sinh nhật thành công");
+        response.setData(result);
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * API Xem chi tiết khách hàng
      * Endpoint: GET /api/v1/crm/customers/1
      */

@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 
@@ -49,7 +50,7 @@ public class Customer {
     private CustomerStatusEnum status = CustomerStatusEnum.ACTIVE;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "group_id") // Tạo cột group_id làm khóa ngoại dưới DB
+    @JoinColumn(name = "customer_group_id")
     private CustomerGroup customerGroup;
 
 
@@ -58,6 +59,8 @@ public class Customer {
 
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    private BigDecimal totalSpent; // Tổng chi tiêu của khách hàng
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")

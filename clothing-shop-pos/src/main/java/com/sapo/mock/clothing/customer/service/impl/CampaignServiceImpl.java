@@ -152,6 +152,7 @@ public class CampaignServiceImpl implements CampaignService {
             CustomerResponse.GroupInfo groupInfo = new CustomerResponse.GroupInfo();
             groupInfo.setId(customer.getCustomerGroup().getId());
             groupInfo.setName(customer.getCustomerGroup().getName());
+            groupInfo.setCode(customer.getCustomerGroup().getCode());
             res.setCustomerGroup(groupInfo);
         }
         return res;

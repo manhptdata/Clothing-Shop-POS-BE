@@ -33,52 +33,56 @@ public class CustomerGroupServiceImpl implements CustomerGroupService {
     // Retrieve all active customer groups.
     @Override
     public Page<CustomerGroupResponse> getGroupsWithPage(Pageable pageable) {
-        return groupRepository.findByStatusOrderByIdAsc(CustomerStatusEnum.ACTIVE, pageable).map(this::convertToResponse);
+        return customerGroupRepository.findAllActiveGroups(pageable);
     }
 
-    private CustomerGroupResponse convertToResponse(CustomerGroup group) {
+
+
+    //  tìm kiếm nhóm ACTIVE
+    @Override
+    public Page<CustomerGroupResponse> searchGroups(String keyword, Pageable pageable) {
+        String cleanKeyword = (keyword != null && !keyword.trim().isEmpty()) ? keyword.trim() : null;
+        return customerGroupRepository.searchGroups(cleanKeyword, pageable);
+    }
+
+    @Override
+    public CustomerGroupResponse getGroupById(Integer id) {
+        return customerGroupRepository.findGroupDetailById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy nhóm khách hàng với ID: " + id));
+    }
+
+    @Override
+    @Transactional
+    public CustomerGroupResponse createGroup(CustomerGroupRequest request) {
+        CustomerGroup group = new CustomerGroup();
+        group.setName(request.getName());
+        group.setDescription(request.getDescription());
+        group.setStatus(request.getStatus());
+        group.setNote(request.getNote());
+        group.setMinSpending(request.getMinSpending());
+        group.setMaxSpending(request.getMaxSpending());
+
+        group.setCode(request.getCode());
+        group = customerGroupRepository.save(group);
+        return convertToResponses(group);
+    }
+
+    // Hàm Helper chuyển dữ liệu từ Entity sang Response DTO của riêng API này
+    private CustomerGroupResponse convertToResponses(CustomerGroup group) {
         CustomerGroupResponse res = new CustomerGroupResponse();
         res.setId(group.getId());
         res.setName(group.getName());
         res.setDescription(group.getDescription());
         res.setStatus(group.getStatus());
         res.setNote(group.getNote());
+        res.setMinSpending(group.getMinSpending());
+        res.setMaxSpending(group.getMaxSpending());
+
+        res.setCode(group.getCode());
+
+        res.setTotalCustomers(0L);
         res.setCreatedAt(group.getCreatedAt());
         return res;
-    }
-
-
-    //  tìm kiếm nhóm ACTIVE
-    @Override
-    public Page<CustomerGroupResponse> searchGroups(String keyword, Pageable pageable) {
-        return groupRepository.searchGroups(keyword, pageable);
-    }
-
-
-    // Lấy chi tiết 1 nhóm
-    @Override
-    public CustomerGroupResponse getGroupById(Integer id) {
-        CustomerGroupResponse response = groupRepository.getGroupDetailById(id);
-        if (response == null) {
-            throw new RuntimeException("Không tìm thấy nhóm khách hàng có ID: " + id);
-        }
-        return response;
-    }
-
-    @Override
-    public CustomerGroupResponse createGroup(CustomerGroupRequest request) {
-        // 1. Chuyển đổi từ Request DTO sang Entity để lưu vào DB
-        CustomerGroup group = new CustomerGroup();
-        group.setName(request.getName().trim());
-        group.setDescription(request.getDescription());
-        group.setNote(request.getNote());
-        // Trường status, createdAt, updatedAt đã được tự động xử lý ở @PrePersist trong Entity rồi nha bạn
-
-        // 2. Lưu xuống database
-        CustomerGroup savedGroup = groupRepository.save(group);
-
-        // 3. Chuyển Entity vừa lưu thành Response DTO để trả về cho Client
-        return convertToResponse(savedGroup);
     }
 
     // create nhóm khách hàng mới
@@ -132,6 +136,7 @@ public class CustomerGroupServiceImpl implements CustomerGroupService {
             CustomerResponse.GroupInfo groupInfo = new CustomerResponse.GroupInfo();
             groupInfo.setId(customer.getCustomerGroup().getId());
             groupInfo.setName(customer.getCustomerGroup().getName());
+            groupInfo.setCode(customer.getCustomerGroup().getCode());
             res.setCustomerGroup(groupInfo);
         }
         return res;
@@ -160,33 +165,29 @@ public class CustomerGroupServiceImpl implements CustomerGroupService {
     }
 
     @Override
-    @Transactional // Đảm bảo an toàn giao dịch DB
+    @Transactional
     public void updateCustomerGroup(Integer id, CustomerGroupRequest request) {
-        // 1. Tìm nhóm khách hàng cũ theo ID, không thấy thì báo lỗi
         CustomerGroup group = customerGroupRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy nhóm khách hàng với ID: " + id));
 
-        // 2. Cập nhật đè dữ liệu mới từ Request vào Entity
         group.setName(request.getName());
         group.setDescription(request.getDescription());
         group.setStatus(request.getStatus());
         group.setNote(request.getNote());
 
-        // 3. Đẩy dữ liệu cập nhật xuống DB (Hàm preUpdate trong Entity sẽ tự kích hoạt)
+        group.setMinSpending(request.getMinSpending());
+        group.setMaxSpending(request.getMaxSpending());
+
         customerGroupRepository.save(group);
     }
-
     @Override
     @Transactional
     public void softDeleteCustomerGroup(Integer id) {
-        // 1. Tìm nhóm khách hàng cần xóa, không thấy thì bắn lỗi
         CustomerGroup group = customerGroupRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy nhóm khách hàng với ID: " + id));
 
-        // 2. Xóa mềm: Chuyển trạng thái sang INACTIVE thay vì xóa hẳn khỏi Database
         group.setStatus(CustomerStatusEnum.INACTIVE);
 
-        // 3. Lưu lại trạng thái mới xuống DB
         customerGroupRepository.save(group);
     }
 }
