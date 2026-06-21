@@ -44,6 +44,7 @@ public class OrderService {
     private final UserRepository userRepository;
     private final CustomerRepository customerRepository;
     private final PointHistoryRepository pointHistoryRepository;
+    private final com.sapo.mock.clothing.customer.repository.CustomerVoucherRepository customerVoucherRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
@@ -107,6 +108,34 @@ public class OrderService {
             lineItems.add(lineItem);
         }
 
+        // Tính toán Voucher trước
+        com.sapo.mock.clothing.entity.CustomerVoucher appliedCustomerVoucher = null;
+        if (dto.getVoucherCode() != null && !dto.getVoucherCode().trim().isEmpty()) {
+            appliedCustomerVoucher = customerVoucherRepository.findUnusedVoucherByCustomerAndCode(customer.getId(), dto.getVoucherCode().trim())
+                    .orElseThrow(() -> new BadRequestException("Mã voucher không hợp lệ, không tồn tại hoặc đã được sử dụng"));
+            
+            Voucher voucher = appliedCustomerVoucher.getVoucher();
+            if (voucher.getStatus() != com.sapo.mock.clothing.util.constant.VoucherCampaignStatusEnum.ACTIVE) {
+                throw new BadRequestException("Voucher này đã bị khóa");
+            }
+            if (appliedCustomerVoucher.getExpiredAt().isBefore(Instant.now())) {
+                throw new BadRequestException("Voucher này đã hết hạn");
+            }
+            if (voucher.getMinOrderValue() != null && totalAmount.compareTo(voucher.getMinOrderValue()) < 0) {
+                throw new BadRequestException("Đơn hàng chưa đạt giá trị tối thiểu (" + voucher.getMinOrderValue() + ") để dùng voucher này");
+            }
+
+            BigDecimal discount = voucher.getDiscountAmount();
+            if (discount.compareTo(totalAmount) > 0) {
+                discount = totalAmount; // Không giảm quá tổng tiền
+            }
+
+            order.setVoucherCode(voucher.getCode());
+            order.setDiscountFromVoucher(discount);
+            totalAmount = totalAmount.subtract(discount);
+        }
+
+        // Tính toán Điểm thưởng sau
         if (dto.getPointsToUse() != null && dto.getPointsToUse() > 0) {
             if (customer.getRewardPoints() < dto.getPointsToUse()) {
                 throw new BadRequestException("Khách hàng không đủ điểm. Điểm hiện tại: " + customer.getRewardPoints());
@@ -138,6 +167,14 @@ public class OrderService {
 
         Order savedOrder = orderRepository.save(order);
         orderLineItemRepository.saveAll(lineItems);
+
+        // Lưu trạng thái sử dụng voucher
+        if (appliedCustomerVoucher != null) {
+            appliedCustomerVoucher.setStatus(com.sapo.mock.clothing.util.constant.CustomerVoucherStatusEnum.USED);
+            appliedCustomerVoucher.setUsedAt(Instant.now());
+            appliedCustomerVoucher.setOrderId(savedOrder.getId());
+            customerVoucherRepository.save(appliedCustomerVoucher);
+        }
 
         // Lưu lịch sử và cập nhật điểm khách hàng
         if (order.getPointsUsed() > 0) {
@@ -223,6 +260,14 @@ public class OrderService {
         Customer customer = customerRepository.findById(order.getCustomerId())
                 .orElseThrow(() -> new ResourceNotFoundException("Khách hàng không tồn tại"));
 
+        // Hoàn Voucher
+        customerVoucherRepository.findByOrderId(savedOrder.getId()).ifPresent(cv -> {
+            cv.setStatus(com.sapo.mock.clothing.util.constant.CustomerVoucherStatusEnum.UNUSED);
+            cv.setUsedAt(null);
+            cv.setOrderId(null);
+            customerVoucherRepository.save(cv);
+        });
+
         // Hoàn trả / trừ lại điểm
         if (order.getPointsUsed() > 0) {
             customer.setRewardPoints(customer.getRewardPoints() + order.getPointsUsed());
@@ -297,6 +342,8 @@ public class OrderService {
                 .pointsUsed(savedOrder.getPointsUsed())
                 .pointsEarned(savedOrder.getPointsEarned())
                 .discountFromPoints(savedOrder.getDiscountFromPoints())
+                .voucherCode(savedOrder.getVoucherCode())
+                .discountFromVoucher(savedOrder.getDiscountFromVoucher())
                 .status(savedOrder.getStatus())
                 .isPrinted(savedOrder.isPrinted())
                 .note(savedOrder.getNote())

@@ -52,6 +52,8 @@ public class OrderServiceTest {
     @Mock
     private PointHistoryRepository pointHistoryRepository;
     @Mock
+    private com.sapo.mock.clothing.customer.repository.CustomerVoucherRepository customerVoucherRepository;
+    @Mock
     private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
@@ -62,6 +64,8 @@ public class OrderServiceTest {
     private Product mockProduct;
     private ProductVariant mockVariant;
     private ReqCreateOrderDTO mockReqDto;
+    private Voucher mockVoucher;
+    private CustomerVoucher mockCustomerVoucher;
 
     @BeforeEach
     void setUp() {
@@ -95,6 +99,20 @@ public class OrderServiceTest {
         itemDto.setQuantity(2);
 
         mockReqDto.setItems(Collections.singletonList(itemDto));
+
+        mockVoucher = new Voucher();
+        mockVoucher.setId(1);
+        mockVoucher.setCode("GIAM50K");
+        mockVoucher.setDiscountAmount(new BigDecimal("50000"));
+        mockVoucher.setMinOrderValue(new BigDecimal("100000"));
+        mockVoucher.setStatus(com.sapo.mock.clothing.util.constant.VoucherCampaignStatusEnum.ACTIVE);
+
+        mockCustomerVoucher = new CustomerVoucher();
+        mockCustomerVoucher.setId(1);
+        mockCustomerVoucher.setCustomer(mockCustomer);
+        mockCustomerVoucher.setVoucher(mockVoucher);
+        mockCustomerVoucher.setStatus(com.sapo.mock.clothing.util.constant.CustomerVoucherStatusEnum.UNUSED);
+        mockCustomerVoucher.setExpiredAt(java.time.Instant.now().plusSeconds(86400)); // Hết hạn ngày mai
     }
 
     @Test
@@ -312,5 +330,41 @@ public class OrderServiceTest {
 
         verify(pointHistoryRepository, times(2)).save(any(PointHistory.class));
         verify(customerRepository, times(1)).save(mockCustomer);
+    }
+
+    @Test
+    void createOrder_WithVoucher_Success() {
+        mockReqDto.setVoucherCode("GIAM50K"); // Mua đơn 200k, xài voucher giảm 50k
+        mockReqDto.setPaidAmount(new BigDecimal("150000"));
+
+        when(userRepository.findByUsername("testuser")).thenReturn(mockUser);
+        when(customerRepository.findById(1)).thenReturn(Optional.of(mockCustomer));
+        when(productVariantRepository.findById(10)).thenReturn(Optional.of(mockVariant));
+        when(orderRepository.countByCreatedAtAfter(any())).thenReturn(0L);
+        when(customerVoucherRepository.findUnusedVoucherByCustomerAndCode(1, "GIAM50K")).thenReturn(Optional.of(mockCustomerVoucher));
+
+        Order savedOrder = new Order();
+        savedOrder.setId(100);
+        savedOrder.setOrderNumber("HD-20230101-003");
+        savedOrder.setCustomerId(1);
+        savedOrder.setTotalAmount(new BigDecimal("150000")); // 200k - 50k
+        savedOrder.setPaidAmount(new BigDecimal("150000"));
+        savedOrder.setChangeAmount(BigDecimal.ZERO);
+        savedOrder.setVoucherCode("GIAM50K");
+        savedOrder.setDiscountFromVoucher(new BigDecimal("50000"));
+        savedOrder.setPointsEarned(150);
+        savedOrder.setStatus(OrderStatus.COMPLETED);
+
+        when(orderRepository.save(any(Order.class))).thenReturn(savedOrder);
+
+        ResOrderDTO result = orderService.createOrder(mockReqDto, "testuser");
+
+        assertNotNull(result);
+        assertEquals(new BigDecimal("150000"), result.getTotalAmount());
+        assertEquals("GIAM50K", result.getVoucherCode());
+        assertEquals(new BigDecimal("50000"), result.getDiscountFromVoucher());
+        assertEquals(com.sapo.mock.clothing.util.constant.CustomerVoucherStatusEnum.USED, mockCustomerVoucher.getStatus());
+
+        verify(customerVoucherRepository, times(1)).save(mockCustomerVoucher);
     }
 }
