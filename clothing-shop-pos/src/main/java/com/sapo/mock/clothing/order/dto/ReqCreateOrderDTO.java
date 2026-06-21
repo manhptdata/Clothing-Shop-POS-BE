@@ -22,6 +22,9 @@ public class ReqCreateOrderDTO {
 
     private Integer pointsToUse = 0; // Số điểm muốn sử dụng trong đơn hàng này
 
+    private String voucherCode; // Mã voucher muốn áp dụng
+
+
     private List<OrderItemDTO> items;
 
     @Getter

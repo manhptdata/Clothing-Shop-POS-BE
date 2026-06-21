@@ -69,6 +69,12 @@ public class Order {
 	@Column(name = "discount_from_points", nullable = false, precision = 15, scale = 2)
 	private BigDecimal discountFromPoints = BigDecimal.ZERO;
 
+	@Column(name = "voucher_code", length = 50)
+	private String voucherCode;
+
+	@Column(name = "discount_from_voucher", nullable = false, precision = 15, scale = 2)
+	private BigDecimal discountFromVoucher = BigDecimal.ZERO;
+
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
 	private OrderStatus status = OrderStatus.COMPLETED;

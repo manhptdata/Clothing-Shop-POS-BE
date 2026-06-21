@@ -32,6 +32,9 @@ public class ResOrderDTO {
     private Integer pointsEarned;
     private BigDecimal discountFromPoints;
 
+    private String voucherCode;
+    private BigDecimal discountFromVoucher;
+
     private OrderStatus status;
     private boolean isPrinted;
     private String note;
