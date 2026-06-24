@@ -30,7 +30,7 @@ public class CustomerGroupListener {
     @EventListener
     @Transactional
     public void handleOrderCompletedEvent(OrderCompletedEvent event) {
-        if (event.getCustomerId() == null || event.getOrderAmount() == null) return;
+        if (event.getCustomerId() == null || event.getCustomerId() == 1 || event.getOrderAmount() == null) return;
 
         // 1. Tìm thông tin khách hàng từ DB
         Customer customer = customerRepository.findById(event.getCustomerId())
