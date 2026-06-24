@@ -167,9 +167,20 @@ public class ProductService implements IProductService {
 
 	private Map<String, ProductOptionValue> processOptions(Product product, List<ProductOptionRequest> requests) {
 		Map<String, ProductOptionValue> valueLookup = new HashMap<>();
-		if (requests == null)
+		if (requests == null || requests.isEmpty()) {
+			product.getOptions().clear();
 			return valueLookup;
+		}
 
+		// 1. Tạo danh sách các tên Option từ Request để kiểm tra
+		List<String> requestNames = requests.stream().map(req -> req.getName().trim().toLowerCase())
+				.collect(Collectors.toList());
+
+		// 2. XÓA: Loại bỏ các option cũ trong DB không còn xuất hiện trong request gửi
+		// lên
+		product.getOptions().removeIf(opt -> !requestNames.contains(opt.getName().trim().toLowerCase()));
+
+		// 3. THÊM / SỬA
 		for (ProductOptionRequest optReq : requests) {
 			String optName = optReq.getName().trim();
 
@@ -185,6 +196,11 @@ public class ProductService implements IProductService {
 			option.setPosition(optReq.getPosition());
 
 			if (optReq.getValues() != null) {
+				// Xử lý xóa bớt giá trị option cũ nếu request không truyền lên
+				List<String> reqValues = optReq.getValues().stream().map(String::trim).map(String::toLowerCase)
+						.collect(Collectors.toList());
+				option.getValues().removeIf(v -> !reqValues.contains(v.getValue().trim().toLowerCase()));
+
 				for (String valStr : optReq.getValues()) {
 					String trimVal = valStr.trim();
 					ProductOptionValue val = option.getValues().stream()
