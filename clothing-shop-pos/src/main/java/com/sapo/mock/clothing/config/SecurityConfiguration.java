@@ -69,6 +69,7 @@ public class SecurityConfiguration {
 	public SecurityFilterChain filterChain(HttpSecurity http,
 			CustomAuthenticationEntryPoint customAuthenticationEntryPoint) throws Exception {
 		http.csrf(csrf -> csrf.disable())
+				.cors(org.springframework.security.config.Customizer.withDefaults())
 				.authorizeHttpRequests(authz -> authz.requestMatchers(WHITE_LIST).permitAll()
 						.requestMatchers("/api/admin/**").hasRole("ADMIN").anyRequest().authenticated())
 				.oauth2ResourceServer(oauth2 -> oauth2

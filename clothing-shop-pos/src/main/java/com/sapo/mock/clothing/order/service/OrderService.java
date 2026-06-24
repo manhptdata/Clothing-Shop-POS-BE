@@ -160,7 +160,7 @@ public class OrderService {
         order.setChangeAmount(dto.getPaidAmount().subtract(totalAmount));
 
         // Tích điểm cho đơn hàng
-        int earnedPoints = totalAmount.divideToIntegralValue(PointConstant.EARN_RATE).intValue();
+        int earnedPoints = customer.getId() == 1 ? 0 : totalAmount.divideToIntegralValue(PointConstant.EARN_RATE).intValue();
         order.setPointsEarned(earnedPoints);
 
         this.deductProductStock(dto.getItems());
@@ -177,28 +177,30 @@ public class OrderService {
         }
 
         // Lưu lịch sử và cập nhật điểm khách hàng
-        if (order.getPointsUsed() > 0) {
-            customer.setRewardPoints(customer.getRewardPoints() - order.getPointsUsed());
-            PointHistory phUse = new PointHistory();
-            phUse.setCustomerId(customer.getId());
-            phUse.setOrderId(savedOrder.getId());
-            phUse.setPointsChange(-order.getPointsUsed());
-            phUse.setType(PointConstant.TYPE_REDEEM);
-            phUse.setDescription("Sử dụng điểm cho đơn hàng " + savedOrder.getOrderNumber());
-            pointHistoryRepository.save(phUse);
+        if (customer.getId() != 1) {
+            if (order.getPointsUsed() > 0) {
+                customer.setRewardPoints(customer.getRewardPoints() - order.getPointsUsed());
+                PointHistory phUse = new PointHistory();
+                phUse.setCustomerId(customer.getId());
+                phUse.setOrderId(savedOrder.getId());
+                phUse.setPointsChange(-order.getPointsUsed());
+                phUse.setType(PointConstant.TYPE_REDEEM);
+                phUse.setDescription("Sử dụng điểm cho đơn hàng " + savedOrder.getOrderNumber());
+                pointHistoryRepository.save(phUse);
+            }
+            
+            if (order.getPointsEarned() > 0) {
+                customer.setRewardPoints(customer.getRewardPoints() + order.getPointsEarned());
+                PointHistory phEarn = new PointHistory();
+                phEarn.setCustomerId(customer.getId());
+                phEarn.setOrderId(savedOrder.getId());
+                phEarn.setPointsChange(order.getPointsEarned());
+                phEarn.setType(PointConstant.TYPE_EARN);
+                phEarn.setDescription("Tích điểm từ đơn hàng " + savedOrder.getOrderNumber());
+                pointHistoryRepository.save(phEarn);
+            }
+            customerRepository.save(customer);
         }
-        
-        if (order.getPointsEarned() > 0) {
-            customer.setRewardPoints(customer.getRewardPoints() + order.getPointsEarned());
-            PointHistory phEarn = new PointHistory();
-            phEarn.setCustomerId(customer.getId());
-            phEarn.setOrderId(savedOrder.getId());
-            phEarn.setPointsChange(order.getPointsEarned());
-            phEarn.setType(PointConstant.TYPE_EARN);
-            phEarn.setDescription("Tích điểm từ đơn hàng " + savedOrder.getOrderNumber());
-            pointHistoryRepository.save(phEarn);
-        }
-        customerRepository.save(customer);
 
         eventPublisher.publishEvent(new OrderCompletedEvent(savedOrder.getCustomerId(), savedOrder.getTotalAmount()));
         return mapToResOrderDTO(savedOrder, lineItems);
@@ -269,27 +271,29 @@ public class OrderService {
         });
 
         // Hoàn trả / trừ lại điểm
-        if (order.getPointsUsed() > 0) {
-            customer.setRewardPoints(customer.getRewardPoints() + order.getPointsUsed());
-            PointHistory phRefund = new PointHistory();
-            phRefund.setCustomerId(customer.getId());
-            phRefund.setOrderId(savedOrder.getId());
-            phRefund.setPointsChange(order.getPointsUsed());
-            phRefund.setType(PointConstant.TYPE_REFUND);
-            phRefund.setDescription("Hoàn điểm do hủy đơn hàng " + savedOrder.getOrderNumber());
-            pointHistoryRepository.save(phRefund);
+        if (customer.getId() != 1) {
+            if (order.getPointsUsed() > 0) {
+                customer.setRewardPoints(customer.getRewardPoints() + order.getPointsUsed());
+                PointHistory phRefund = new PointHistory();
+                phRefund.setCustomerId(customer.getId());
+                phRefund.setOrderId(savedOrder.getId());
+                phRefund.setPointsChange(order.getPointsUsed());
+                phRefund.setType(PointConstant.TYPE_REFUND);
+                phRefund.setDescription("Hoàn điểm do hủy đơn hàng " + savedOrder.getOrderNumber());
+                pointHistoryRepository.save(phRefund);
+            }
+            if (order.getPointsEarned() > 0) {
+                customer.setRewardPoints(customer.getRewardPoints() - order.getPointsEarned());
+                PointHistory phRevertEarn = new PointHistory();
+                phRevertEarn.setCustomerId(customer.getId());
+                phRevertEarn.setOrderId(savedOrder.getId());
+                phRevertEarn.setPointsChange(-order.getPointsEarned());
+                phRevertEarn.setType(PointConstant.TYPE_REFUND);
+                phRevertEarn.setDescription("Trừ điểm tích lũy do hủy đơn hàng " + savedOrder.getOrderNumber());
+                pointHistoryRepository.save(phRevertEarn);
+            }
+            customerRepository.save(customer);
         }
-        if (order.getPointsEarned() > 0) {
-            customer.setRewardPoints(customer.getRewardPoints() - order.getPointsEarned());
-            PointHistory phRevertEarn = new PointHistory();
-            phRevertEarn.setCustomerId(customer.getId());
-            phRevertEarn.setOrderId(savedOrder.getId());
-            phRevertEarn.setPointsChange(-order.getPointsEarned());
-            phRevertEarn.setType(PointConstant.TYPE_REFUND);
-            phRevertEarn.setDescription("Trừ điểm tích lũy do hủy đơn hàng " + savedOrder.getOrderNumber());
-            pointHistoryRepository.save(phRevertEarn);
-        }
-        customerRepository.save(customer);
 
         List<OrderLineItem> items = orderLineItemRepository.findByOrderId(id);
         for (OrderLineItem item : items) {
