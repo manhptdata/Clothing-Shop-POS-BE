@@ -119,6 +119,19 @@ public class ProductSpecification {
 							cb.greaterThan(outOfStockRoot.get("quantity"), 0L));
 					predicates.add(cb.equal(outOfStockSubquery, 0L));
 					break;
+				case "partial-out-of-stock":
+					// Yêu cầu mới: Có ít nhất 1 variant có quantity <= 0
+					Subquery<Long> partialOutOfStockSubquery = query.subquery(Long.class);
+					Root<ProductVariant> partialOutOfStockkRoot = partialOutOfStockSubquery.from(ProductVariant.class);
+
+					// Đếm số lượng variant của sản phẩm này có quantity <= 0
+					partialOutOfStockSubquery.select(cb.count(partialOutOfStockkRoot)).where(
+							cb.equal(partialOutOfStockkRoot.get("product"), root),
+							cb.lessThanOrEqualTo(partialOutOfStockkRoot.get("quantity"), 0));
+
+					// Điều kiện: Số lượng variant hết hàng phải > 0 (tức là tồn tại ít nhất 1 cái)
+					predicates.add(cb.greaterThan(partialOutOfStockSubquery, 0L));
+					break;
 
 				default:
 					break;
