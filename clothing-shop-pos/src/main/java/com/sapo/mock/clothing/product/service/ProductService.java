@@ -226,17 +226,27 @@ public class ProductService implements IProductService {
 			return;
 
 		for (ProductVariantRequest vReq : requests) {
-			String reqSku = vReq.getSku().trim();
+			String reqSku = vReq.getSku() != null ? vReq.getSku().trim() : "";
 
-			ProductVariant variant = product.getVariants().stream().filter(v -> v.getSku().equalsIgnoreCase(reqSku))
+			if (reqSku.isEmpty()) {
+				reqSku = java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+				// Đảm bảo SKU sinh ra không bị trùng
+				while (productVariantRepository.existsBySku(reqSku)) {
+					reqSku = java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+				}
+			}
+
+			final String finalSku = reqSku;
+
+			ProductVariant variant = product.getVariants().stream().filter(v -> v.getSku().equalsIgnoreCase(finalSku))
 					.findFirst().orElse(null);
 
 			if (variant == null) {
-				if (productVariantRepository.existsBySku(reqSku)) {
-					throw new BadRequestException("Mã SKU '" + reqSku + "' đã bị trùng với sản phẩm khác!");
+				if (productVariantRepository.existsBySku(finalSku)) {
+					throw new BadRequestException("Mã SKU '" + finalSku + "' đã bị trùng với sản phẩm khác!");
 				}
 				variant = new ProductVariant();
-				variant.setSku(reqSku);
+				variant.setSku(finalSku);
 				variant.setQuantity(0);
 				product.addVariant(variant);
 			}
