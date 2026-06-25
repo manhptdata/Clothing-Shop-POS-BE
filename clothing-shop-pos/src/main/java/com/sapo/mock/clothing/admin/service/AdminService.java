@@ -6,7 +6,9 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.sapo.mock.clothing.admin.DTO.UserCreateRequest;
 import com.sapo.mock.clothing.admin.DTO.UserResponse;
+import com.sapo.mock.clothing.admin.DTO.UserUpdateRequest;
 import com.sapo.mock.clothing.entity.User;
 import com.sapo.mock.clothing.exception.BadRequestException;
 import com.sapo.mock.clothing.exception.ResourceNotFoundException;
@@ -30,19 +32,41 @@ public class AdminService {
 	}
 
 	// 2. Tạo mới nhân viên
-	public UserResponse createEmployee(User user) {
-		if (userRepository.existsByUsername(user.getUsername())) {
-			throw new BadRequestException("username này đã tồn tại");
+	@Transactional
+	public UserResponse createEmployee(UserCreateRequest request) {
+		if (userRepository.existsByUsername(request.getUsername())) {
+			throw new BadRequestException("Username này đã tồn tại");
 		}
-		if (userRepository.existsByPhone(user.getPhone())) {
-			throw new BadRequestException("số điện thoại này đã tồn tại");
+		if (request.getPhone() != null && !request.getPhone().isEmpty() && userRepository.existsByPhone(request.getPhone())) {
+			throw new BadRequestException("Số điện thoại này đã tồn tại");
+		}
 
-		}
-		if (user.getUsername().equalsIgnoreCase(null))
-			if (user.getPasswordHash() != null) {
-				user.setPasswordHash(passwordEncoder.encode(user.getPasswordHash()));
-			}
+		User user = new User();
+		user.setUsername(request.getUsername());
+		user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+		user.setFullName(request.getFullName());
+		user.setPhone(request.getPhone());
+		user.setRole(request.getRole());
 		user.setActive(true);
+
+		userRepository.save(user);
+		return toUserResponse(user);
+	}
+
+	// Cập nhật thông tin nhân viên
+	@Transactional
+	public UserResponse updateEmployee(Integer id, UserUpdateRequest request) {
+		User user = userRepository.findById(id)
+				.orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân viên"));
+
+		if (request.getPhone() != null && !request.getPhone().isEmpty() && userRepository.existsByPhoneAndIdNot(request.getPhone(), id)) {
+			throw new BadRequestException("Số điện thoại này đã được sử dụng bởi nhân viên khác");
+		}
+
+		user.setFullName(request.getFullName());
+		user.setPhone(request.getPhone());
+		user.setRole(request.getRole());
+
 		userRepository.save(user);
 		return toUserResponse(user);
 	}

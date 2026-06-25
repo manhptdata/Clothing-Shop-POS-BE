@@ -14,10 +14,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.sapo.mock.clothing.admin.DTO.UserCreateRequest;
 import com.sapo.mock.clothing.admin.DTO.UserResponse;
+import com.sapo.mock.clothing.admin.DTO.UserUpdateRequest;
 import com.sapo.mock.clothing.admin.service.AdminService;
 import com.sapo.mock.clothing.common.dto.response.RestResponse;
-import com.sapo.mock.clothing.entity.User;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/admin/employees")
@@ -46,9 +48,16 @@ public class AdminUserController {
 
 	@PostMapping
 	@PreAuthorize("hasRole('ROLE_ADMIN')")
-	public ResponseEntity<RestResponse<UserResponse>> createEmployee(@RequestBody User user) {
-		UserResponse createdUser = adminService.createEmployee(user);
+	public ResponseEntity<RestResponse<UserResponse>> createEmployee(@Valid @RequestBody UserCreateRequest request) {
+		UserResponse createdUser = adminService.createEmployee(request);
 		return ResponseEntity.ok(new RestResponse<>(201, null, "Tạo nhân viên thành công", createdUser));
+	}
+
+	@PutMapping("/{id}")
+	@PreAuthorize("hasRole('ROLE_ADMIN')")
+	public ResponseEntity<RestResponse<UserResponse>> updateEmployee(@PathVariable Integer id, @Valid @RequestBody UserUpdateRequest request) {
+		UserResponse updatedUser = adminService.updateEmployee(id, request);
+		return ResponseEntity.ok(new RestResponse<>(200, null, "Cập nhật thông tin nhân viên thành công", updatedUser));
 	}
 
 	// Khóa tài khoản (Gửi status = false)

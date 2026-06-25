@@ -24,4 +24,6 @@ public interface UserRepository extends JpaRepository<User, Integer>, JpaSpecifi
 	List<User> findAll();
 
 	Optional<User> findById(Integer id);
+
+	boolean existsByPhoneAndIdNot(String phone, Integer id);
 }

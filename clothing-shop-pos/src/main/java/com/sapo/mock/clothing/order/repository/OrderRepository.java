@@ -11,4 +11,9 @@ import java.time.Instant;
 public interface OrderRepository extends JpaRepository<Order, Integer>, JpaSpecificationExecutor<Order> {
 
     long countByCreatedAtAfter(Instant startOfDay);
+
+    long countByCreatedAtBetween(Instant start, Instant end);
+
+    @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.status = com.sapo.mock.clothing.util.constant.OrderStatus.COMPLETED AND o.createdAt BETWEEN :start AND :end")
+    java.math.BigDecimal calculateRevenueBetween(@org.springframework.data.repository.query.Param("start") Instant start, @org.springframework.data.repository.query.Param("end") Instant end);
 }
