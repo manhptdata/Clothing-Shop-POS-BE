@@ -49,8 +49,9 @@ public class ProductService implements IProductService {
 
 	@Override
 	public Page<ProductResponse> getAllProducts(Pageable pageable, String search, String productName, String sku,
-			Integer categoryID, Boolean isDeleted) {
-		Specification<Product> spe = ProductSpecification.build(search, productName, sku, categoryID, isDeleted);
+			Integer categoryID, Boolean isDeleted, String stockStatus) {
+		Specification<Product> spe = ProductSpecification.build(search, productName, sku, categoryID, isDeleted,
+				stockStatus);
 		return productRepository.findAll(spe, pageable).map(this::toProductResponse);
 	}
 

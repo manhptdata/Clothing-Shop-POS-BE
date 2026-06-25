@@ -9,7 +9,7 @@ import com.sapo.mock.clothing.product.DTO.ProductResponse;
 public interface IProductService {
 
 	Page<ProductResponse> getAllProducts(Pageable pageable, String search, String productName, String sku,
-			Integer categoryID, Boolean isDeleted);
+			Integer categoryID, Boolean isDeleted, String stockStatus);
 
 	ProductResponse creatProduct(ProductRequest request, String username);
 

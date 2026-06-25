@@ -40,9 +40,9 @@ public class ProductController {
 	public ResponseEntity<RestResponse<Page<ProductResponse>>> getAllProducts(Pageable pageable,
 			@RequestParam(required = false) String search, @RequestParam(required = false) String productName,
 			@RequestParam(required = false) String sku, @RequestParam(required = false) Integer categoryID,
-			@RequestParam(required = false) Boolean isDeleted) {
+			@RequestParam(required = false) Boolean isDeleted, @RequestParam(required = false) String stockStatus) {
 		Page<ProductResponse> products = productService.getAllProducts(pageable, search, productName, sku, categoryID,
-				isDeleted);
+				isDeleted, stockStatus);
 		RestResponse<Page<ProductResponse>> response = new RestResponse<>(200, null,
 				"Lấy danh sách sản phẩm thành công", products);
 		return ResponseEntity.ok(response);
