@@ -20,6 +20,8 @@ public class ReqCreateOrderDTO {
 
     private String note;
 
+    private String paymentMethod;
+
     private Integer pointsToUse = 0; // Số điểm muốn sử dụng trong đơn hàng này
 
     private String voucherCode; // Mã voucher muốn áp dụng
