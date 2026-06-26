@@ -1,6 +1,7 @@
 package com.sapo.mock.clothing.receipt.service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -170,8 +171,27 @@ public class StockReceiptService implements IStockReceiptService {
 			int oldQuantity = variant.getQuantity() != null ? variant.getQuantity() : 0;
 			int newQuantity = oldQuantity + item.getQuantity();
 
-			// Cập nhật tồn kho vật lý
+			// Tính giá bình quân gia quyền di động (MAC)
+			BigDecimal oldImportPrice = variant.getImportPrice() != null ? variant.getImportPrice() : BigDecimal.ZERO;
+			BigDecimal itemImportPrice = item.getImportPrice() != null ? item.getImportPrice() : BigDecimal.ZERO;
+			BigDecimal newImportPrice;
+
+			if (oldQuantity <= 0) {
+				newImportPrice = itemImportPrice;
+			} else {
+				BigDecimal totalOldValue = oldImportPrice.multiply(BigDecimal.valueOf(oldQuantity));
+				BigDecimal totalNewValue = itemImportPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
+				BigDecimal totalQuantity = BigDecimal.valueOf(newQuantity);
+				if (totalQuantity.compareTo(BigDecimal.ZERO) > 0) {
+					newImportPrice = totalOldValue.add(totalNewValue).divide(totalQuantity, 2, RoundingMode.HALF_UP);
+				} else {
+					newImportPrice = BigDecimal.ZERO;
+				}
+			}
+
+			// Cập nhật tồn kho vật lý và giá vốn bình quân
 			variant.setQuantity(newQuantity);
+			variant.setImportPrice(newImportPrice);
 			variantRepository.save(variant);
 
 			// 3. Ghi Audit Trail
@@ -189,6 +209,67 @@ public class StockReceiptService implements IStockReceiptService {
 			stockLogRepository.save(log);
 		}
 
+		receiptRepository.save(receipt);
+		return mapToResponse(receipt);
+	}
+
+	@Override
+	@Transactional
+	public StockReceiptResponse cancelReceipt(Integer receiptId, Integer userId) {
+		StockReceipt receipt = receiptRepository.findById(receiptId)
+				.orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu nhập"));
+
+		if (receipt.getStatus() == ReceiptStatus.CANCELLED) {
+			throw new BadRequestException("Phiếu nhập đã bị hủy trước đó");
+		}
+
+		// Nếu phiếu đang ở CONFIRMED, trừ tồn kho và rollback giá vốn MAC
+		if (receipt.getStatus() == ReceiptStatus.CONFIRMED) {
+			for (StockReceiptItem item : receipt.getItems()) {
+				ProductVariant variant = variantRepository.findById(item.getVariant().getId()).orElseThrow(
+						() -> new BadRequestException("Không tìm thấy biến thể SP ID: " + item.getVariant().getId()));
+
+				int oldQuantity = variant.getQuantity() != null ? variant.getQuantity() : 0;
+				int newQuantity = oldQuantity - item.getQuantity();
+
+				// Tính toán rollback giá vốn bình quân gia quyền di động (MAC)
+				BigDecimal currentImportPrice = variant.getImportPrice() != null ? variant.getImportPrice() : BigDecimal.ZERO;
+				BigDecimal itemImportPrice = item.getImportPrice() != null ? item.getImportPrice() : BigDecimal.ZERO;
+				BigDecimal newImportPrice = currentImportPrice;
+
+				if (newQuantity > 0 && oldQuantity > item.getQuantity()) {
+					BigDecimal totalCurrentValue = currentImportPrice.multiply(BigDecimal.valueOf(oldQuantity));
+					BigDecimal totalItemValue = itemImportPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
+					BigDecimal remainingValue = totalCurrentValue.subtract(totalItemValue);
+					BigDecimal remainingQty = BigDecimal.valueOf(newQuantity);
+					if (remainingValue.compareTo(BigDecimal.ZERO) < 0) {
+						newImportPrice = BigDecimal.ZERO;
+					} else {
+						newImportPrice = remainingValue.divide(remainingQty, 2, RoundingMode.HALF_UP);
+					}
+				}
+
+				// Cập nhật biến thể
+				variant.setQuantity(newQuantity);
+				variant.setImportPrice(newImportPrice);
+				variantRepository.save(variant);
+
+				// Ghi Audit Trail
+				StockLog log = new StockLog();
+				log.setVariant(variant);
+				log.setQuantityBefore(oldQuantity);
+				log.setQuantityChange(-item.getQuantity());
+				log.setQuantityAfter(newQuantity);
+				log.setReferenceId(receipt.getId());
+				log.setReferenceType(StockLogReferenceType.RECEIPT);
+				log.setSource(StockLogSource.DIEU_CHINH);
+				log.setNote("Hủy duyệt phiếu nhập " + receipt.getCode());
+
+				stockLogRepository.save(log);
+			}
+		}
+
+		receipt.setStatus(ReceiptStatus.CANCELLED);
 		receiptRepository.save(receipt);
 		return mapToResponse(receipt);
 	}

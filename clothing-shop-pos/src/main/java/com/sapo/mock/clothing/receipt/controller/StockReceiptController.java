@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -54,6 +55,15 @@ public class StockReceiptController {
 		StockReceiptResponse receipt = receiptService.confirmReceipt(id, MOCK_USER_ID);
 		RestResponse<StockReceiptResponse> response = new RestResponse<>(200, null,
 				"Duyệt phiếu và cộng tồn kho thành công", receipt);
+		return ResponseEntity.ok(response);
+	}
+
+	// 2.5. Hủy duyệt phiếu nhập (Trừ tồn kho & rollback giá vốn)
+	@PostMapping("/{id}/cancel")
+	public ResponseEntity<RestResponse<StockReceiptResponse>> cancelReceipt(@PathVariable Integer id) {
+		StockReceiptResponse receipt = receiptService.cancelReceipt(id, MOCK_USER_ID);
+		RestResponse<StockReceiptResponse> response = new RestResponse<>(200, null,
+				"Hủy duyệt phiếu nhập thành công", receipt);
 		return ResponseEntity.ok(response);
 	}
 
