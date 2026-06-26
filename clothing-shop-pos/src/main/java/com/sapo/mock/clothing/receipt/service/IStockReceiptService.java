@@ -5,6 +5,7 @@ import org.springframework.data.domain.Pageable;
 
 import com.sapo.mock.clothing.receipt.DTO.StockReceiptRequest;
 import com.sapo.mock.clothing.receipt.DTO.StockReceiptResponse;
+import com.sapo.mock.clothing.util.constant.ReceiptStatus;
 
 public interface IStockReceiptService {
 	StockReceiptResponse createReceipt(StockReceiptRequest request, Integer userId);
@@ -17,6 +18,6 @@ public interface IStockReceiptService {
 
 	StockReceiptResponse getReceiptById(Integer receiptId);
 
-	Page<StockReceiptResponse> getAllReceipts(Pageable pageable);
+	Page<StockReceiptResponse> getAllReceipts(String search, ReceiptStatus status, Pageable pageable);
 
 }
