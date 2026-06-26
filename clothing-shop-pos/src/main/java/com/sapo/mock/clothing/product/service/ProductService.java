@@ -288,6 +288,9 @@ public class ProductService implements IProductService {
 		if (request.getCategoryId() != null) {
 			Category category = categoryRepository.findById(request.getCategoryId())
 					.orElseThrow(() -> new ResourceNotFoundException("Danh mục không tồn tại"));
+			if (!category.isActive() || category.isDeleted()) {
+				throw new BadRequestException("Danh mục không còn hoạt động hoặc đã bị xóa");
+			}
 			product.setCategory(category);
 		}
 		product.setDescription(request.getDescription());
