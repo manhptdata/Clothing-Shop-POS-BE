@@ -13,6 +13,8 @@ public interface IStockReceiptService {
 
 	StockReceiptResponse confirmReceipt(Integer receiptId, Integer userId);
 
+	StockReceiptResponse cancelReceipt(Integer receiptId, Integer userId);
+
 	StockReceiptResponse getReceiptById(Integer receiptId);
 
 	Page<StockReceiptResponse> getAllReceipts(Pageable pageable);

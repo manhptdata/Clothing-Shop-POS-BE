@@ -238,7 +238,7 @@ public class ProductService implements IProductService {
 
 			final String finalSku = reqSku;
 
-			ProductVariant variant = product.getVariants().stream().filter(v -> v.getSku().equalsIgnoreCase(finalSku))
+			ProductVariant variant = product.getVariants().stream().filter(v -> v.getSku().trim().equalsIgnoreCase(finalSku))
 					.findFirst().orElse(null);
 
 			if (variant == null) {
@@ -248,11 +248,21 @@ public class ProductService implements IProductService {
 				variant = new ProductVariant();
 				variant.setSku(finalSku);
 				variant.setQuantity(0);
+				variant.setImportPrice(vReq.getImportPrice());
 				product.addVariant(variant);
+			} else {
+				// Nếu biến thể đã tồn tại và có tồn kho > 0, chặn chỉnh sửa giá vốn khác giá cũ
+				if (variant.getQuantity() != null && variant.getQuantity() > 0) {
+					if (vReq.getImportPrice() != null && variant.getImportPrice() != null
+							&& vReq.getImportPrice().compareTo(variant.getImportPrice()) != 0) {
+						throw new BadRequestException("Không thể chỉnh sửa trực tiếp giá vốn của biến thể '" + variant.getSku() 
+								+ "' khi tồn kho lớn hơn 0. Hãy điều chỉnh thông qua phiếu nhập kho.");
+					}
+				}
+				variant.setImportPrice(vReq.getImportPrice());
 			}
 
 			variant.setSalePrice(vReq.getSalePrice());
-			variant.setImportPrice(vReq.getImportPrice());
 			variant.setLowStockThreshold(vReq.getLowStockThreshold() != null ? vReq.getLowStockThreshold() : 5);
 
 			variant.setOption1Value(

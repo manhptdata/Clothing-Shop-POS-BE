@@ -58,6 +58,15 @@ public class StockReceiptController {
 		return ResponseEntity.ok(response);
 	}
 
+	// 2.5. Hủy duyệt phiếu nhập (Trừ tồn kho & rollback giá vốn)
+	@PostMapping("/{id}/cancel")
+	public ResponseEntity<RestResponse<StockReceiptResponse>> cancelReceipt(@PathVariable Integer id) {
+		StockReceiptResponse receipt = receiptService.cancelReceipt(id, MOCK_USER_ID);
+		RestResponse<StockReceiptResponse> response = new RestResponse<>(200, null,
+				"Hủy duyệt phiếu nhập thành công", receipt);
+		return ResponseEntity.ok(response);
+	}
+
 	// 3. Xem chi tiết phiếu nhập
 	@GetMapping("/{id}")
 	public ResponseEntity<RestResponse<StockReceiptResponse>> getReceiptById(@PathVariable Integer id) {

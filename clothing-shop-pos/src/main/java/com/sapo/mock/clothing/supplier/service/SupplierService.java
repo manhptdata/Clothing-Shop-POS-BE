@@ -58,6 +58,13 @@ public class SupplierService implements ISupplierService {
 	@Override
 	@Transactional
 	public SupplierResponse createSupplier(SupplierRequest request) {
+		if (request.getPhone() != null && !request.getPhone().isBlank() && supplierRepository.existsByPhone(request.getPhone())) {
+			throw new BadRequestException("Số điện thoại đã tồn tại");
+		}
+		if (request.getEmail() != null && !request.getEmail().isBlank() && supplierRepository.existsByEmail(request.getEmail())) {
+			throw new BadRequestException("Email đã tồn tại");
+		}
+
 		Supplier supplier = new Supplier();
 		supplier.setName(request.getName());
 		supplier.setPhone(request.getPhone());
@@ -75,6 +82,13 @@ public class SupplierService implements ISupplierService {
 	public SupplierResponse updateSupplier(Integer id, SupplierRequest request) {
 		Supplier supplier = supplierRepository.findById(id)
 				.orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Nhà cung cấp"));
+
+		if (request.getPhone() != null && !request.getPhone().isBlank() && supplierRepository.existsByPhoneAndIdNot(request.getPhone(), id)) {
+			throw new BadRequestException("Số điện thoại đã tồn tại");
+		}
+		if (request.getEmail() != null && !request.getEmail().isBlank() && supplierRepository.existsByEmailAndIdNot(request.getEmail(), id)) {
+			throw new BadRequestException("Email đã tồn tại");
+		}
 
 		supplier.setName(request.getName());
 		supplier.setPhone(request.getPhone());
