@@ -1,6 +1,7 @@
 package com.sapo.mock.clothing.receipt.service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -170,8 +171,27 @@ public class StockReceiptService implements IStockReceiptService {
 			int oldQuantity = variant.getQuantity() != null ? variant.getQuantity() : 0;
 			int newQuantity = oldQuantity + item.getQuantity();
 
-			// Cập nhật tồn kho vật lý
+			// Tính giá bình quân gia quyền di động (MAC)
+			BigDecimal oldImportPrice = variant.getImportPrice() != null ? variant.getImportPrice() : BigDecimal.ZERO;
+			BigDecimal itemImportPrice = item.getImportPrice() != null ? item.getImportPrice() : BigDecimal.ZERO;
+			BigDecimal newImportPrice;
+
+			if (oldQuantity <= 0) {
+				newImportPrice = itemImportPrice;
+			} else {
+				BigDecimal totalOldValue = oldImportPrice.multiply(BigDecimal.valueOf(oldQuantity));
+				BigDecimal totalNewValue = itemImportPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
+				BigDecimal totalQuantity = BigDecimal.valueOf(newQuantity);
+				if (totalQuantity.compareTo(BigDecimal.ZERO) > 0) {
+					newImportPrice = totalOldValue.add(totalNewValue).divide(totalQuantity, 2, RoundingMode.HALF_UP);
+				} else {
+					newImportPrice = BigDecimal.ZERO;
+				}
+			}
+
+			// Cập nhật tồn kho vật lý và giá vốn bình quân
 			variant.setQuantity(newQuantity);
+			variant.setImportPrice(newImportPrice);
 			variantRepository.save(variant);
 
 			// 3. Ghi Audit Trail
