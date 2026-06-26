@@ -9,12 +9,14 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.sapo.mock.clothing.common.dto.response.RestResponse;
 import com.sapo.mock.clothing.receipt.DTO.StockReceiptRequest;
 import com.sapo.mock.clothing.receipt.DTO.StockReceiptResponse;
 import com.sapo.mock.clothing.receipt.service.IStockReceiptService;
+import com.sapo.mock.clothing.util.constant.ReceiptStatus;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -77,8 +79,11 @@ public class StockReceiptController {
 	}
 
 	@GetMapping
-	public ResponseEntity<RestResponse<Page<StockReceiptResponse>>> getAllReceipts(Pageable pageable) {
-		Page<StockReceiptResponse> receipts = receiptService.getAllReceipts(pageable);
+	public ResponseEntity<RestResponse<Page<StockReceiptResponse>>> getAllReceipts(
+			@RequestParam(required = false) String search,
+			@RequestParam(required = false) ReceiptStatus status,
+			Pageable pageable) {
+		Page<StockReceiptResponse> receipts = receiptService.getAllReceipts(search, status, pageable);
 		RestResponse<Page<StockReceiptResponse>> response = new RestResponse<>(200, null,
 				"Lấy danh sách phiếu nhập thành công", receipts);
 		return ResponseEntity.ok(response);

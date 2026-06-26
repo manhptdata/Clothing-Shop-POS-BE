@@ -5,9 +5,11 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +25,7 @@ import com.sapo.mock.clothing.receipt.DTO.StockReceiptRequest;
 import com.sapo.mock.clothing.receipt.DTO.StockReceiptResponse;
 import com.sapo.mock.clothing.receipt.repository.StockLogRepository;
 import com.sapo.mock.clothing.receipt.repository.StockReceiptRepository;
+import com.sapo.mock.clothing.specification.StockReceiptSpecification;
 import com.sapo.mock.clothing.supplier.repository.SupplierRepository;
 import com.sapo.mock.clothing.util.constant.ReceiptStatus;
 import com.sapo.mock.clothing.util.constant.StockLogReferenceType;
@@ -342,8 +345,9 @@ public class StockReceiptService implements IStockReceiptService {
 	}
 
 	@Override
-	public Page<StockReceiptResponse> getAllReceipts(Pageable pageable) {
-
-		return receiptRepository.findAll(pageable).map(this::mapToResponse);
+	public Page<StockReceiptResponse> getAllReceipts(String search, ReceiptStatus status, Pageable pageable) {
+		Specification<StockReceipt> spec = StockReceiptSpecification.filterReceipts(search, status);
+		Page<StockReceipt> pageResult = receiptRepository.findAll(spec, pageable);
+		return pageResult.map(this::mapToResponse);
 	}
 }
