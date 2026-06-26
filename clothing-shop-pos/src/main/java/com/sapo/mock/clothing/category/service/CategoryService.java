@@ -80,9 +80,12 @@ public class CategoryService implements ICategoryService {
 
 		// Thực hiện xóa mềm
 		category.setDeleted(true);
-		categoryRepository.save(category);
+		Category savedCategory = categoryRepository.save(category);
 
-		return toCategoryResponse(category);
+		// Chuyển sản phẩm sang danh mục chung
+		moveProductsToDefaultCategory(id);
+
+		return toCategoryResponse(savedCategory);
 	}
 
 	@Override
@@ -91,9 +94,12 @@ public class CategoryService implements ICategoryService {
 		Category category = categoryRepository.findById(id)
 				.orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục với ID: " + id));
 
-		// Kiểm tra xem danh mục đã được xóa mềm chưa
+		if (category.isActive()) {
+			throw new BadRequestException("Danh mục vẫn đang hoạt động, không thể xóa cứng. Hãy ngừng hoạt động danh mục trước!");
+		}
+
 		if (!category.isDeleted()) {
-			throw new BadRequestException("Danh mục vẫn đang hoạt động, không thể xóa cứng. Hãy xóa mềm trước!");
+			throw new BadRequestException("Danh mục vẫn chưa được xóa mềm, không thể xóa cứng. Hãy xóa mềm trước!");
 		}
 
 		// Kiểm tra xem có sản phẩm nào đang cắm vào danh mục này không
@@ -126,6 +132,24 @@ public class CategoryService implements ICategoryService {
 		category.setActive(active);
 		Category updatedCategory = categoryRepository.save(category);
 
+		// Nếu ngừng hoạt động, chuyển sản phẩm sang danh mục chung
+		if (!active) {
+			moveProductsToDefaultCategory(id);
+		}
+
 		return toCategoryResponse(updatedCategory);
+	}
+
+	private void moveProductsToDefaultCategory(Integer oldCategoryId) {
+		Category defaultCategory = categoryRepository.findByNameIgnoreCase("Danh mục chung")
+				.orElseGet(() -> categoryRepository.save(Category.builder()
+						.name("Danh mục chung")
+						.active(true)
+						.deleted(false)
+						.build()));
+
+		if (!defaultCategory.getId().equals(oldCategoryId)) {
+			productRepository.updateCategoryForProducts(oldCategoryId, defaultCategory);
+		}
 	}
 }
