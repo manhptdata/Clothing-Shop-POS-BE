@@ -73,6 +73,10 @@ public class CategoryService implements ICategoryService {
 		Category category = categoryRepository.findById(id)
 				.orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục với ID: " + id));
 
+		if (category.isActive()) {
+			throw new BadRequestException("Danh mục vẫn đang hoạt động, không thể xóa. Hãy ngừng hoạt động danh mục trước!");
+		}
+
 		// Kiểm tra xem đã xóa chưa
 		if (category.isDeleted()) {
 			throw new RuntimeException("Danh mục này đã bị xóa trước đó");
