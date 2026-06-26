@@ -17,8 +17,9 @@ public class ReqCreateOrderDTO {
     private Integer customerId;
 
 
-    @NotNull(message = "Số tiền khách trả không được để trống")
     private BigDecimal paidAmount;
+
+    private com.sapo.mock.clothing.util.constant.OrderStatus status;
 
     private String note;
 

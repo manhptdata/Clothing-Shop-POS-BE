@@ -222,10 +222,10 @@ public class OrderServiceTest {
         Pageable pageable = PageRequest.of(0, 5);
         Page<Order> page = new PageImpl<>(Arrays.asList(order1, order2), pageable, 2);
 
-        when(orderRepository.findAll(pageable)).thenReturn(page);
+        when(orderRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable))).thenReturn(page);
         when(orderLineItemRepository.findByOrderIdIn(anyList())).thenReturn(Collections.emptyList());
 
-        ResultPaginationDTO result = orderService.getAllOrders(pageable);
+        ResultPaginationDTO result = orderService.getAllOrders(pageable, null);
 
         assertNotNull(result);
         assertEquals(1, result.getMeta().getPage());

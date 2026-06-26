@@ -23,6 +23,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.jpa.domain.Specification;
+import com.sapo.mock.clothing.specification.OrderSpecification;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -64,8 +66,9 @@ public class OrderService {
         order.setCreatedBy(createdBy.getId());
         order.setCreatedByUsername(createdBy.getUsername());
         order.setNote(dto.getNote());
-        order.setPaidAmount(dto.getPaidAmount());
-        order.setStatus(OrderStatus.COMPLETED);
+        order.setPaidAmount(dto.getPaidAmount() != null ? dto.getPaidAmount() : BigDecimal.ZERO);
+        OrderStatus status = dto.getStatus() != null ? dto.getStatus() : OrderStatus.COMPLETED;
+        order.setStatus(status);
         order.setPrinted(false);
 
         String dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
@@ -151,58 +154,65 @@ public class OrderService {
             totalAmount = totalAmount.subtract(discount);
         }
 
-        if (dto.getPaidAmount().compareTo(totalAmount) < 0) {
-            throw new BadRequestException(
-                    "Số tiền khách đưa (" + dto.getPaidAmount() + ") không đủ để thanh toán đơn hàng (" + totalAmount + ")");
-        }
-
         order.setTotalAmount(totalAmount);
-        order.setChangeAmount(dto.getPaidAmount().subtract(totalAmount));
 
-        // Tích điểm cho đơn hàng
-        int earnedPoints = customer.getId() == 1 ? 0 : totalAmount.divideToIntegralValue(PointConstant.EARN_RATE).intValue();
-        order.setPointsEarned(earnedPoints);
+        if (status == OrderStatus.COMPLETED) {
+            if (dto.getPaidAmount() == null || dto.getPaidAmount().compareTo(totalAmount) < 0) {
+                throw new BadRequestException(
+                        "Số tiền khách đưa (" + (dto.getPaidAmount() != null ? dto.getPaidAmount() : BigDecimal.ZERO) + ") không đủ để thanh toán đơn hàng (" + totalAmount + ")");
+            }
+            order.setChangeAmount(dto.getPaidAmount().subtract(totalAmount));
+            // Tích điểm cho đơn hàng
+            int earnedPoints = customer.getId() == 1 ? 0 : totalAmount.divideToIntegralValue(PointConstant.EARN_RATE).intValue();
+            order.setPointsEarned(earnedPoints);
+        } else {
+            order.setChangeAmount(BigDecimal.ZERO);
+            order.setPointsEarned(0);
+        }
 
         this.deductProductStock(dto.getItems());
 
         Order savedOrder = orderRepository.save(order);
         orderLineItemRepository.saveAll(lineItems);
 
-        // Lưu trạng thái sử dụng voucher
-        if (appliedCustomerVoucher != null) {
-            appliedCustomerVoucher.setStatus(com.sapo.mock.clothing.util.constant.CustomerVoucherStatusEnum.USED);
-            appliedCustomerVoucher.setUsedAt(Instant.now());
-            appliedCustomerVoucher.setOrderId(savedOrder.getId());
-            customerVoucherRepository.save(appliedCustomerVoucher);
+        if (status == OrderStatus.COMPLETED) {
+            // Lưu trạng thái sử dụng voucher
+            if (appliedCustomerVoucher != null) {
+                appliedCustomerVoucher.setStatus(com.sapo.mock.clothing.util.constant.CustomerVoucherStatusEnum.USED);
+                appliedCustomerVoucher.setUsedAt(Instant.now());
+                appliedCustomerVoucher.setOrderId(savedOrder.getId());
+                customerVoucherRepository.save(appliedCustomerVoucher);
+            }
+
+            // Lưu lịch sử và cập nhật điểm khách hàng
+            if (customer.getId() != 1) {
+                if (order.getPointsUsed() > 0) {
+                    customer.setRewardPoints(customer.getRewardPoints() - order.getPointsUsed());
+                    PointHistory phUse = new PointHistory();
+                    phUse.setCustomerId(customer.getId());
+                    phUse.setOrderId(savedOrder.getId());
+                    phUse.setPointsChange(-order.getPointsUsed());
+                    phUse.setType(PointConstant.TYPE_REDEEM);
+                    phUse.setDescription("Sử dụng điểm cho đơn hàng " + savedOrder.getOrderNumber());
+                    pointHistoryRepository.save(phUse);
+                }
+                
+                if (order.getPointsEarned() > 0) {
+                    customer.setRewardPoints(customer.getRewardPoints() + order.getPointsEarned());
+                    PointHistory phEarn = new PointHistory();
+                    phEarn.setCustomerId(customer.getId());
+                    phEarn.setOrderId(savedOrder.getId());
+                    phEarn.setPointsChange(order.getPointsEarned());
+                    phEarn.setType(PointConstant.TYPE_EARN);
+                    phEarn.setDescription("Tích điểm từ đơn hàng " + savedOrder.getOrderNumber());
+                    pointHistoryRepository.save(phEarn);
+                }
+                customerRepository.save(customer);
+            }
+
+            eventPublisher.publishEvent(new OrderCompletedEvent(savedOrder.getCustomerId(), savedOrder.getTotalAmount()));
         }
 
-        // Lưu lịch sử và cập nhật điểm khách hàng
-        if (customer.getId() != 1) {
-            if (order.getPointsUsed() > 0) {
-                customer.setRewardPoints(customer.getRewardPoints() - order.getPointsUsed());
-                PointHistory phUse = new PointHistory();
-                phUse.setCustomerId(customer.getId());
-                phUse.setOrderId(savedOrder.getId());
-                phUse.setPointsChange(-order.getPointsUsed());
-                phUse.setType(PointConstant.TYPE_REDEEM);
-                phUse.setDescription("Sử dụng điểm cho đơn hàng " + savedOrder.getOrderNumber());
-                pointHistoryRepository.save(phUse);
-            }
-            
-            if (order.getPointsEarned() > 0) {
-                customer.setRewardPoints(customer.getRewardPoints() + order.getPointsEarned());
-                PointHistory phEarn = new PointHistory();
-                phEarn.setCustomerId(customer.getId());
-                phEarn.setOrderId(savedOrder.getId());
-                phEarn.setPointsChange(order.getPointsEarned());
-                phEarn.setType(PointConstant.TYPE_EARN);
-                phEarn.setDescription("Tích điểm từ đơn hàng " + savedOrder.getOrderNumber());
-                pointHistoryRepository.save(phEarn);
-            }
-            customerRepository.save(customer);
-        }
-
-        eventPublisher.publishEvent(new OrderCompletedEvent(savedOrder.getCustomerId(), savedOrder.getTotalAmount()));
         return mapToResOrderDTO(savedOrder, lineItems);
     }
 
@@ -214,8 +224,9 @@ public class OrderService {
         return mapToResOrderDTO(order, items);
     }
 
-    public ResultPaginationDTO getAllOrders(Pageable pageable) {
-        Page<Order> pageOrder = orderRepository.findAll(pageable);
+    public ResultPaginationDTO getAllOrders(Pageable pageable, OrderStatus status) {
+        Specification<Order> spec = OrderSpecification.build(status);
+        Page<Order> pageOrder = orderRepository.findAll(spec, pageable);
         ResultPaginationDTO rs = new ResultPaginationDTO();
         ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
 
@@ -245,6 +256,192 @@ public class OrderService {
 
         rs.setResult(listRes);
         return rs;
+    }
+
+    @Transactional
+    public ResOrderDTO updateOrder(Integer id, ReqCreateOrderDTO dto, String username) {
+        User createdBy = userRepository.findByUsername(username);
+        if (createdBy == null) {
+            throw new ResourceNotFoundException("Không tìm thấy người dùng: " + username);
+        }
+
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Đơn hàng ID " + id + " không tồn tại"));
+
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new BadRequestException("Chỉ có thể cập nhật đơn hàng ở trạng thái Đang xử lý");
+        }
+
+        Customer customer = customerRepository.findById(dto.getCustomerId())
+                .orElseThrow(() -> new ResourceNotFoundException("Khách hàng ID " + dto.getCustomerId() + " không tồn tại"));
+
+        // 1. Revert stock of old items
+        List<OrderLineItem> oldItems = orderLineItemRepository.findByOrderId(id);
+        for (OrderLineItem item : oldItems) {
+            ProductVariant variant = productVariantRepository.findById(item.getVariantId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Không tìm thấy thông tin tồn kho của sản phẩm ID " + item.getVariantId()));
+            variant.setQuantity(variant.getQuantity() + item.getQuantity());
+            productVariantRepository.save(variant);
+        }
+        orderLineItemRepository.deleteAll(oldItems);
+
+        // 2. Set new basic info
+        order.setCustomerId(customer.getId());
+        order.setCustomerName(customer.getFullName());
+        order.setCreatedBy(createdBy.getId());
+        order.setCreatedByUsername(createdBy.getUsername());
+        order.setNote(dto.getNote());
+        order.setPaidAmount(dto.getPaidAmount() != null ? dto.getPaidAmount() : BigDecimal.ZERO);
+        
+        OrderStatus status = dto.getStatus() != null ? dto.getStatus() : OrderStatus.COMPLETED;
+        order.setStatus(status);
+
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        List<OrderLineItem> lineItems = new ArrayList<>();
+
+        // 3. Process new items
+        for (ReqCreateOrderDTO.OrderItemDTO itemDto : dto.getItems()) {
+            ProductVariant variant = productVariantRepository.findById(itemDto.getVariantId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Sản phẩm ID " + itemDto.getVariantId() + " không tồn tại"));
+
+            BigDecimal unitPrice = variant.getSalePrice();
+            BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(itemDto.getQuantity()));
+            totalAmount = totalAmount.add(subtotal);
+
+            OrderLineItem lineItem = new OrderLineItem();
+            lineItem.setVariantId(variant.getId());
+            
+            // Build full product name with options
+            String fullName = variant.getProduct().getName();
+            List<String> options = new ArrayList<>();
+            if (variant.getOption1Value() != null) options.add(variant.getOption1Value().getValue());
+            if (variant.getOption2Value() != null) options.add(variant.getOption2Value().getValue());
+            if (variant.getOption3Value() != null) options.add(variant.getOption3Value().getValue());
+            if (!options.isEmpty()) {
+                fullName += " (" + String.join(" - ", options) + ")";
+            }
+            lineItem.setProductName(fullName);
+            lineItem.setProductSku(variant.getSku());
+            lineItem.setQuantity(itemDto.getQuantity());
+            lineItem.setUnitPrice(unitPrice);
+            lineItem.setSubtotal(subtotal);
+            lineItem.setOrder(order);
+
+            lineItems.add(lineItem);
+        }
+
+        // Voucher & Points calculations
+        com.sapo.mock.clothing.entity.CustomerVoucher appliedCustomerVoucher = null;
+        if (dto.getVoucherCode() != null && !dto.getVoucherCode().trim().isEmpty()) {
+            appliedCustomerVoucher = customerVoucherRepository.findUnusedVoucherByCustomerAndCode(customer.getId(), dto.getVoucherCode().trim())
+                    .orElseThrow(() -> new BadRequestException("Mã voucher không hợp lệ, không tồn tại hoặc đã được sử dụng"));
+            
+            Voucher voucher = appliedCustomerVoucher.getVoucher();
+            if (voucher.getStatus() != com.sapo.mock.clothing.util.constant.VoucherCampaignStatusEnum.ACTIVE) {
+                throw new BadRequestException("Voucher này đã bị khóa");
+            }
+            if (appliedCustomerVoucher.getExpiredAt().isBefore(Instant.now())) {
+                throw new BadRequestException("Voucher này đã hết hạn");
+            }
+            if (voucher.getMinOrderValue() != null && totalAmount.compareTo(voucher.getMinOrderValue()) < 0) {
+                throw new BadRequestException("Đơn hàng chưa đạt giá trị tối thiểu (" + voucher.getMinOrderValue() + ") để dùng voucher này");
+            }
+
+            BigDecimal discount = voucher.getDiscountAmount();
+            if (discount.compareTo(totalAmount) > 0) {
+                discount = totalAmount;
+            }
+
+            order.setVoucherCode(voucher.getCode());
+            order.setDiscountFromVoucher(discount);
+            totalAmount = totalAmount.subtract(discount);
+        } else {
+            order.setVoucherCode(null);
+            order.setDiscountFromVoucher(BigDecimal.ZERO);
+        }
+
+        if (dto.getPointsToUse() != null && dto.getPointsToUse() > 0) {
+            if (customer.getRewardPoints() < dto.getPointsToUse()) {
+                throw new BadRequestException("Khách hàng không đủ điểm. Điểm hiện tại: " + customer.getRewardPoints());
+            }
+            
+            BigDecimal discount = BigDecimal.valueOf(dto.getPointsToUse()).multiply(PointConstant.REDEEM_RATE);
+            if (discount.compareTo(totalAmount) > 0) {
+                discount = totalAmount;
+            }
+            
+            order.setPointsUsed(dto.getPointsToUse());
+            order.setDiscountFromPoints(discount);
+            totalAmount = totalAmount.subtract(discount);
+        } else {
+            order.setPointsUsed(0);
+            order.setDiscountFromPoints(BigDecimal.ZERO);
+        }
+
+        order.setTotalAmount(totalAmount);
+
+        if (status == OrderStatus.COMPLETED) {
+            if (dto.getPaidAmount() == null || dto.getPaidAmount().compareTo(totalAmount) < 0) {
+                throw new BadRequestException(
+                        "Số tiền khách đưa (" + (dto.getPaidAmount() != null ? dto.getPaidAmount() : BigDecimal.ZERO) + ") không đủ để thanh toán đơn hàng (" + totalAmount + ")");
+            }
+            order.setChangeAmount(dto.getPaidAmount().subtract(totalAmount));
+            
+            // Tích điểm
+            int earnedPoints = customer.getId() == 1 ? 0 : totalAmount.divideToIntegralValue(PointConstant.EARN_RATE).intValue();
+            order.setPointsEarned(earnedPoints);
+        } else {
+            order.setChangeAmount(BigDecimal.ZERO);
+            order.setPointsEarned(0);
+        }
+
+        // Deduct new stock
+        this.deductProductStock(dto.getItems());
+
+        Order savedOrder = orderRepository.save(order);
+        orderLineItemRepository.saveAll(lineItems);
+
+        if (status == OrderStatus.COMPLETED) {
+            // Lưu trạng thái sử dụng voucher
+            if (appliedCustomerVoucher != null) {
+                appliedCustomerVoucher.setStatus(com.sapo.mock.clothing.util.constant.CustomerVoucherStatusEnum.USED);
+                appliedCustomerVoucher.setUsedAt(Instant.now());
+                appliedCustomerVoucher.setOrderId(savedOrder.getId());
+                customerVoucherRepository.save(appliedCustomerVoucher);
+            }
+
+            // Cập nhật điểm khách hàng
+            if (customer.getId() != 1) {
+                if (order.getPointsUsed() > 0) {
+                    customer.setRewardPoints(customer.getRewardPoints() - order.getPointsUsed());
+                    PointHistory phUse = new PointHistory();
+                    phUse.setCustomerId(customer.getId());
+                    phUse.setOrderId(savedOrder.getId());
+                    phUse.setPointsChange(-order.getPointsUsed());
+                    phUse.setType(PointConstant.TYPE_REDEEM);
+                    phUse.setDescription("Sử dụng điểm cho đơn hàng " + savedOrder.getOrderNumber());
+                    pointHistoryRepository.save(phUse);
+                }
+                
+                if (order.getPointsEarned() > 0) {
+                    customer.setRewardPoints(customer.getRewardPoints() + order.getPointsEarned());
+                    PointHistory phEarn = new PointHistory();
+                    phEarn.setCustomerId(customer.getId());
+                    phEarn.setOrderId(savedOrder.getId());
+                    phEarn.setPointsChange(order.getPointsEarned());
+                    phEarn.setType(PointConstant.TYPE_EARN);
+                    phEarn.setDescription("Tích điểm từ đơn hàng " + savedOrder.getOrderNumber());
+                    pointHistoryRepository.save(phEarn);
+                }
+                customerRepository.save(customer);
+            }
+
+            eventPublisher.publishEvent(new OrderCompletedEvent(savedOrder.getCustomerId(), savedOrder.getTotalAmount()));
+        }
+
+        return mapToResOrderDTO(savedOrder, lineItems);
     }
 
     @Transactional

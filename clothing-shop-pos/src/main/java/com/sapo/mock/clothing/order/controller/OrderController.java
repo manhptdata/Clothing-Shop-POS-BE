@@ -42,9 +42,22 @@ public class OrderController {
 
     @GetMapping
     @ApiMessage("Lấy danh sách đơn hàng thành công")
-    public ResponseEntity<ResultPaginationDTO> getAllOrders(Pageable pageable) {
-        ResultPaginationDTO rs = orderService.getAllOrders(pageable);
+    public ResponseEntity<ResultPaginationDTO> getAllOrders(
+            Pageable pageable,
+            @RequestParam(required = false) com.sapo.mock.clothing.util.constant.OrderStatus status) {
+        ResultPaginationDTO rs = orderService.getAllOrders(pageable, status);
         return ResponseEntity.ok(rs);
+    }
+
+    @PutMapping("/{id}")
+    @ApiMessage("Cập nhật đơn hàng thành công")
+    public ResponseEntity<ResOrderDTO> updateOrder(
+            @PathVariable Integer id,
+            @Valid @RequestBody ReqCreateOrderDTO dto) throws IdInvalidException {
+        String username = SecurityUtil.getCurrentUserLogin()
+                .orElseThrow(() -> new IdInvalidException("Vui lòng đăng nhập"));
+        ResOrderDTO updatedOrder = orderService.updateOrder(id, dto, username);
+        return ResponseEntity.ok(updatedOrder);
     }
 
     @PutMapping("/{id}/cancel")
