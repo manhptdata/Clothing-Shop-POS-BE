@@ -9,6 +9,8 @@ import com.sapo.mock.clothing.receipt.DTO.StockReceiptResponse;
 public interface IStockReceiptService {
 	StockReceiptResponse createReceipt(StockReceiptRequest request, Integer userId);
 
+	StockReceiptResponse updateReceipt(Integer receiptId, StockReceiptRequest request, Integer userId);
+
 	StockReceiptResponse confirmReceipt(Integer receiptId, Integer userId);
 
 	StockReceiptResponse getReceiptById(Integer receiptId);

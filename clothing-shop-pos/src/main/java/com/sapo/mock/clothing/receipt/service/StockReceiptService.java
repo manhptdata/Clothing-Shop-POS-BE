@@ -96,6 +96,56 @@ public class StockReceiptService implements IStockReceiptService {
 
 	@Override
 	@Transactional
+	public StockReceiptResponse updateReceipt(Integer receiptId, StockReceiptRequest request, Integer userId) {
+		StockReceipt receipt = receiptRepository.findById(receiptId)
+				.orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu nhập"));
+
+		if (receipt.getStatus() != ReceiptStatus.DRAFT) {
+			throw new BadRequestException("Chỉ có thể sửa phiếu nhập khi đang ở trạng thái nháp");
+		}
+
+		Supplier supplier = supplierRepository.findByIdAndActiveTrue(request.getSupplierId())
+				.orElseThrow(() -> new ResourceNotFoundException("không tìm thấy nhà cung cấp hoặc đã ngừng hợp tác"));
+
+		receipt.setSupplier(supplier);
+		receipt.setNote(request.getNote());
+
+		int totalQty = 0;
+		BigDecimal totalAmt = BigDecimal.ZERO;
+
+		// Xóa toàn bộ item cũ
+		receipt.getItems().clear();
+
+		for (StockReceiptRequest.StockReceiptItemRequest itemReq : request.getItems()) {
+			if (itemReq.getQuantity() <= 0) {
+				throw new BadRequestException("Số lượng nhập phải lớn hơn 0");
+			}
+
+			ProductVariant variant = variantRepository.findById(itemReq.getVariantId())
+					.orElseThrow(() -> new ResourceNotFoundException("không tìm thấy variant sản phẩm"));
+
+			StockReceiptItem item = new StockReceiptItem();
+			item.setReceipt(receipt);
+			item.setVariant(variant);
+			item.setQuantity(itemReq.getQuantity());
+			item.setImportPrice(itemReq.getImportPrice());
+
+			totalQty += itemReq.getQuantity();
+
+			BigDecimal price = (itemReq.getImportPrice() != null) ? itemReq.getImportPrice() : BigDecimal.ZERO;
+			totalAmt = totalAmt.add(price.multiply(BigDecimal.valueOf(itemReq.getQuantity())));
+
+			receipt.getItems().add(item);
+		}
+
+		receipt.setTotalQuantity(totalQty);
+
+		StockReceipt savedReceipt = receiptRepository.save(receipt);
+		return mapToResponse(savedReceipt);
+	}
+
+	@Override
+	@Transactional
 	public StockReceiptResponse confirmReceipt(Integer receiptId, Integer userId) {
 		StockReceipt receipt = receiptRepository.findById(receiptId)
 				.orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu nhập"));

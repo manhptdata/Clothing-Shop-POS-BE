@@ -38,6 +38,16 @@ public class StockReceiptController {
 		return ResponseEntity.status(201).body(response);
 	}
 
+	@PutMapping("/{id}")
+	public ResponseEntity<RestResponse<StockReceiptResponse>> updateReceipt(
+			@PathVariable Integer id,
+			@Valid @RequestBody StockReceiptRequest request) {
+		StockReceiptResponse receipt = receiptService.updateReceipt(id, request, MOCK_USER_ID);
+		RestResponse<StockReceiptResponse> response = new RestResponse<>(200, null,
+				"Cập nhật phiếu nhập kho thành công", receipt);
+		return ResponseEntity.ok(response);
+	}
+
 	// 2. Duyệt phiếu nhập (Cộng tồn kho)
 	@PostMapping("/{id}/confirm")
 	public ResponseEntity<RestResponse<StockReceiptResponse>> confirmReceipt(@PathVariable Integer id) {
