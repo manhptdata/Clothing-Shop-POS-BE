@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: clothing-shop-db
+    restart: always
+    environment:
+      MYSQL_DATABASE: clothing_shop_db
+      MYSQL_ROOT_PASSWORD: 123456
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      # Automatically seed the database on initial startup
+      - ./clothing-shop-pos/src/main/resources/seed_test_data.sql:/docker-entrypoint-initdb.d/seed_test_data.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p123456"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: ./clothing-shop-pos
+      dockerfile: Dockerfile
+    container_name: clothing-shop-be
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/clothing_shop_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=123456
+      - SAPO_JWT_BASE64_SECRET=aG9hbmdtZWxpbmhfc2Fwb19pbnRlcm5fY2xvdGhpbmdfc2hvcF9wb3Nfc3VwZXJfc2VjcmV0X2tleV8xMjM0NTY3ODkw
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db_data:
