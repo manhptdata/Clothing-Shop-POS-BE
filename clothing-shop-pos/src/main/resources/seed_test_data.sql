@@ -15,7 +15,7 @@ INSERT INTO user (username, password_hash, full_name, phone, role, is_active, cr
 ('wh01',   '$2a$10$26IhRLEHb3p5ZGoxsLiyCevhGyJyxhgF/eGszXGQyJxFH.QQJD9ya', 'NV Kho',       '0903333333', 'ROLE_WH',   TRUE, NOW()),
 ('admin', '$2a$10$26IhRLEHb3p5ZGoxsLiyCevhGyJyxhgF/eGszXGQyJxFH.QQJD9ya', 'Manager', '0903333366', 'ROLE_ADMIN', TRUE, NOW());
 
---2 Khách vãng lai
+-- 2 Khách vãng lai
 INSERT INTO customer (id, full_name, phone, gender, status, reward_points, total_spent, customer_group_id, created_at, updated_at) 
 VALUES (1, 'Khách vãng lai', '0000000000', 'OTHER', 'ACTIVE', 0, 0.00, NULL, NOW(), NOW());
 
