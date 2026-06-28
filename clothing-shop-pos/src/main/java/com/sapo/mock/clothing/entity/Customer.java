@@ -65,6 +65,13 @@ public class Customer {
     @Column(name = "reward_points", nullable = false)
     private Integer rewardPoints = 0; // Điểm thưởng tích lũy
 
+    @Column(name = "email")
+    private String email;
+
+    @Column(name = "is_potential", columnDefinition = "boolean default false")
+    private Boolean isPotential = false;
+
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")
     private User createdBy;

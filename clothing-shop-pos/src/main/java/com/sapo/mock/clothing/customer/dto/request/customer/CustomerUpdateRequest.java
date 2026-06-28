@@ -21,6 +21,9 @@ public class CustomerUpdateRequest {
     @Size(max = 15, message = "Số điện thoại không được vượt quá 15 ký tự")
     private String phone;
 
+    @Email(message = "Email không đúng định dạng")
+    private String email;
+
     @PastOrPresent(message = "Ngày sinh không được là một ngày trong tương lai")
     private LocalDate dateOfBirth;
 

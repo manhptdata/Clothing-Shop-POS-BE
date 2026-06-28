@@ -29,7 +29,7 @@ public interface CampaignService {
     void deleteCareLog(Integer id);
 
     // Hàm tìm kiếm lịch sử chăm sóc
-    Page<CareLogListResponse> searchCareLogs(String keyword, String result, Instant fromDate, Instant toDate, Pageable pageable);
+    Page<CareLogListResponse> searchCareLogs(String keyword, String result, String potentialStatus, Instant fromDate, Instant toDate, Pageable pageable);
     // Hàm lấy chi tiết 1 bản ghi CareLog
     CareLogResponse getCareLogDetail(Integer id);
 

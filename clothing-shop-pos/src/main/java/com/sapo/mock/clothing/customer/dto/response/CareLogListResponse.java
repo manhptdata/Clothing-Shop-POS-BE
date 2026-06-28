@@ -11,6 +11,7 @@ public class CareLogListResponse {
     private String result;
     private Instant calledAt;
     private Instant createdAt;
+    private String potentialStatus;
 
     private CustomerInfo customer;
     private UserInfo calledBy;

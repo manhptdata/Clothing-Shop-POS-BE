@@ -12,6 +12,7 @@ import com.sapo.mock.clothing.util.constant.CustomerVoucherStatusEnum;
 import com.sapo.mock.clothing.util.constant.RankCodeEnum;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,9 @@ public class BirthdayVoucherScheduler {
     private final CustomerRepository customerRepository;
     private final VoucherRepository voucherRepository;
     private final CustomerVoucherRepository customerVoucherRepository;
+    @Autowired
+    private EmailNotificationService emailNotificationService;
+
 
     /**
      * Tự động kích hoạt vào 00:00:00 mỗi nửa đêm để quét và phát voucher tự động
@@ -68,9 +72,9 @@ public class BirthdayVoucherScheduler {
                 issueVoucherIfNotExist(customer, silverVoucher, startOfMonth, getEndOfMonthInstant(today));
             }
 
-            // 2. LUỒNG HẠNG VÀNG (GOLD): Nhận đúng ngày sinh nhật, hết hạn hết ngày
-            if (customer.getDateOfBirth().getDayOfMonth() == currentDay && rank == RankCodeEnum.GOLD && goldVoucher != null) {
-                issueVoucherIfNotExist(customer, goldVoucher, startOfToday, getEndOfDayInstant(today));
+            // 2. LUỒNG HẠNG VÀNG (GOLD): Nhận và dùng cả tháng sinh nhật (Giống Hạng Bạc)
+            if (rank == RankCodeEnum.GOLD && goldVoucher != null) {
+                issueVoucherIfNotExist(customer, goldVoucher, startOfMonth, getEndOfMonthInstant(today));
             }
         }
         log.info(">>> [CRM VOUCHER] Kết thúc tiến trình tự động quét phát hành Voucher an toàn.");
@@ -94,6 +98,9 @@ public class BirthdayVoucherScheduler {
             customerVoucherRepository.save(cv);
             log.info(">> CRM PRO SUCCESS: Đã chuyển Voucher [{}] vào ví của khách hàng: {}",
                     voucher.getName(), customer.getFullName());
+
+            String testEmail = (customer.getEmail() != null) ? customer.getEmail() : "manhwakunchi@gmail.com";
+            emailNotificationService.sendBirthdayVoucherEmail(testEmail, customer.getFullName(), voucher.getCode());
         }
     }
 
@@ -105,4 +112,6 @@ public class BirthdayVoucherScheduler {
         LocalDate lastDay = date.with(TemporalAdjusters.lastDayOfMonth());
         return lastDay.atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
     }
+
+
 }

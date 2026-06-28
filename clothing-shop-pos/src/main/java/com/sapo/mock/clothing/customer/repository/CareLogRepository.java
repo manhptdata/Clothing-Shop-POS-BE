@@ -45,11 +45,13 @@ public interface CareLogRepository extends JpaRepository<CareLog, Integer> {
             "WHERE (:searchKeyword IS NULL OR c.phone LIKE CONCAT('%', :searchKeyword, '%') " +
             "OR LOWER(c.fullName) LIKE LOWER(CONCAT('%', :searchKeyword, '%'))) " + // <-- Thêm tìm theo tên không phân biệt hoa thường
             "AND (:result IS NULL OR cl.result = :result) " +
+            "AND (:potentialStatus IS NULL OR cl.potentialStatus = :potentialStatus) " +
             "AND (:fromDate IS NULL OR cl.calledAt >= :fromDate) " +
             "AND (:toDate IS NULL OR cl.calledAt <= :toDate)")
     Page<CareLog> searchCareLogs(
             @Param("searchKeyword") String searchKeyword, // Đổi tên từ phone thành searchKeyword cho đúng bản chất
             @Param("result") String result,
+            @Param("potentialStatus") String potentialStatus,
             @Param("fromDate") Instant fromDate,
             @Param("toDate") Instant toDate,
             Pageable pageable

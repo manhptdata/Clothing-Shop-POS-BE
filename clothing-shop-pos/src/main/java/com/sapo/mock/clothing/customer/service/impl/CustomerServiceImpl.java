@@ -49,6 +49,7 @@ public class CustomerServiceImpl implements CustomerService {
         response.setId(customer.getId());
         response.setFullName(customer.getFullName());
         response.setPhone(customer.getPhone());
+        response.setEmail(customer.getEmail());
         response.setDateOfBirth(customer.getDateOfBirth());
         response.setGender(customer.getGender());
         response.setAddress(customer.getAddress());
@@ -110,6 +111,8 @@ public class CustomerServiceImpl implements CustomerService {
         Customer customer = new Customer();
         customer.setFullName(request.getFullName());
         customer.setPhone(request.getPhone());
+        String emailInput = (request.getEmail() == null || request.getEmail().trim().isEmpty()) ? null : request.getEmail().trim();
+        customer.setEmail(emailInput);
         customer.setDateOfBirth(request.getDateOfBirth());
         customer.setGender(request.getGender());
         customer.setAddress(request.getAddress());
@@ -133,6 +136,8 @@ public class CustomerServiceImpl implements CustomerService {
         // Map updated data from the request to the existing entity.
         customer.setFullName(request.getFullName());
         customer.setPhone(request.getPhone());
+        String emailInput = (request.getEmail() == null || request.getEmail().trim().isEmpty()) ? null : request.getEmail().trim();
+        customer.setEmail(emailInput);
         customer.setDateOfBirth(request.getDateOfBirth());
         customer.setGender(request.getGender());
         customer.setAddress(request.getAddress());

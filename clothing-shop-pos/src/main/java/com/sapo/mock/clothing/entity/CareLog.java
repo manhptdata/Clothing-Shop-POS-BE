@@ -47,6 +47,9 @@ public class CareLog {
 	@Column(length = 20)
 	private String result;
 
+	@Column(name = "potential_status", length = 20)
+	private String potentialStatus;
+
 	@Column(columnDefinition = "TEXT")
 	private String note;
 

@@ -26,6 +26,8 @@ public class CustomerResponse {
     private Instant createdAt;
     private Integer rewardPoints;
 
+    private String email;
+
 
     // Hiện tại chưa làm tính năng điểm thì gán mặc định luôn ở đây
    /* private Integer rewardPoints = 0;

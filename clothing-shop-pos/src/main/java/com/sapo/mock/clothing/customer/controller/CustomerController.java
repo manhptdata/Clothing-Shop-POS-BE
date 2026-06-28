@@ -6,7 +6,10 @@ import com.sapo.mock.clothing.customer.dto.request.customer.CustomerUpdateReques
 import com.sapo.mock.clothing.customer.dto.response.CustomerResponse;
 import com.sapo.mock.clothing.customer.dto.response.OrderHistoryResponse;
 import com.sapo.mock.clothing.customer.service.CustomerService;
+import com.sapo.mock.clothing.customer.service.file.CustomerFileService;
+import com.sapo.mock.clothing.customer.service.file.ExcelHelper;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -15,14 +18,21 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/crm/customers")
 @CrossOrigin(origins = "*") // Enable CORS for frontend requests.
+@RequiredArgsConstructor
 public class CustomerController {
 
     @Autowired
     private CustomerService customerService;
+
+
+    private final CustomerFileService customerFileService;
 
     /**
      * Customer lookup API using the shared RestResponse format.
@@ -195,5 +205,28 @@ public class CustomerController {
         response.setData(result);
 
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/import")
+    public ResponseEntity<?> importCustomersExcel(@RequestParam("file") MultipartFile file) {
+        // 1. Kiểm tra file trống
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Vui lòng chọn một file Excel trước khi gửi!"));
+        }
+
+        // 2. Kiểm tra định dạng file có phải .xlsx không
+        if (!ExcelHelper.hasExcelFormat(file)) {
+            return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                    .body(Map.of("message", "Định dạng file không hợp lệ! Vui lòng upload file .xlsx"));
+        }
+
+        try {
+            // 3. Thực hiện import dữ liệu
+            customerFileService.saveCustomersFromExcel(file);
+            return ResponseEntity.ok(Map.of("message", "Import danh sách khách hàng bằng Excel thành công!"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Import thất bại: " + e.getMessage()));
+        }
     }
 }
