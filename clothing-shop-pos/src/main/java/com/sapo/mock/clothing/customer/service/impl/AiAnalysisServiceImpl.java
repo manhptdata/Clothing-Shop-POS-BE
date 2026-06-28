@@ -24,7 +24,9 @@ public class AiAnalysisServiceImpl implements AiAnalysisService {
     @Value("${ai.gemini.api-url}")
     private String apiUrl;
 
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(java.time.Duration.ofSeconds(10))
+            .build();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
@@ -66,6 +68,7 @@ public class AiAnalysisServiceImpl implements AiAnalysisService {
                     .uri(URI.create(url))
                     .header("Content-Type", "application/json")
                     .header("X-goog-api-key", apiKey)
+                    .timeout(java.time.Duration.ofSeconds(15))
                     .POST(HttpRequest.BodyPublishers.ofString(jsonPayload, java.nio.charset.StandardCharsets.UTF_8))
                     .build();
 
