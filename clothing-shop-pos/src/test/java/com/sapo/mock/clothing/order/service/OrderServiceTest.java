@@ -76,7 +76,7 @@ public class OrderServiceTest {
         mockUser.setUsername("testuser");
 
         mockCustomer = new Customer();
-        mockCustomer.setId(1);
+        mockCustomer.setId(2);
         mockCustomer.setFullName("Nguyễn Văn A");
         mockCustomer.setRewardPoints(1000);
 
@@ -92,7 +92,7 @@ public class OrderServiceTest {
         mockVariant.setQuantity(50); // initial stock
 
         mockReqDto = new ReqCreateOrderDTO();
-        mockReqDto.setCustomerId(1);
+        mockReqDto.setCustomerId(2);
         mockReqDto.setNote("Test order");
         mockReqDto.setPaidAmount(new BigDecimal("200000"));
 
@@ -120,7 +120,7 @@ public class OrderServiceTest {
     @Test
     void createOrder_Success() {
         when(userRepository.findByUsername("testuser")).thenReturn(mockUser);
-        when(customerRepository.findById(1)).thenReturn(Optional.of(mockCustomer));
+        when(customerRepository.findById(2)).thenReturn(Optional.of(mockCustomer));
         when(productVariantRepository.findById(10)).thenReturn(Optional.of(mockVariant));
 
         when(orderRepository.countByCreatedAtAfter(any())).thenReturn(0L);
@@ -128,7 +128,7 @@ public class OrderServiceTest {
         Order savedOrder = new Order();
         savedOrder.setId(100);
         savedOrder.setOrderNumber("HD-20230101-001");
-        savedOrder.setCustomerId(1);
+        savedOrder.setCustomerId(2);
         savedOrder.setCustomerName("Nguyễn Văn A");
         savedOrder.setCreatedBy(1);
         savedOrder.setCreatedByUsername("testuser");
@@ -169,7 +169,7 @@ public class OrderServiceTest {
     @Test
     void createOrder_InsufficientPaidAmount_ThrowsException() {
         when(userRepository.findByUsername("testuser")).thenReturn(mockUser);
-        when(customerRepository.findById(1)).thenReturn(Optional.of(mockCustomer));
+        when(customerRepository.findById(2)).thenReturn(Optional.of(mockCustomer));
         when(productVariantRepository.findById(10)).thenReturn(Optional.of(mockVariant));
 
         mockReqDto.setPaidAmount(new BigDecimal("50000"));
@@ -243,7 +243,7 @@ public class OrderServiceTest {
     void cancelOrder_Success() {
         Order order = new Order();
         order.setId(100);
-        order.setCustomerId(1);
+        order.setCustomerId(2);
         order.setStatus(OrderStatus.COMPLETED);
         order.setPointsEarned(200);
 
@@ -255,7 +255,7 @@ public class OrderServiceTest {
 
         when(orderRepository.findById(100)).thenReturn(Optional.of(order));
         when(orderRepository.save(any(Order.class))).thenReturn(order);
-        when(customerRepository.findById(1)).thenReturn(Optional.of(mockCustomer));
+        when(customerRepository.findById(2)).thenReturn(Optional.of(mockCustomer));
         when(orderLineItemRepository.findByOrderId(100)).thenReturn(Collections.singletonList(item));
         when(productVariantRepository.findById(10)).thenReturn(Optional.of(mockVariant));
 
@@ -305,14 +305,14 @@ public class OrderServiceTest {
         mockReqDto.setPaidAmount(new BigDecimal("150000"));
 
         when(userRepository.findByUsername("testuser")).thenReturn(mockUser);
-        when(customerRepository.findById(1)).thenReturn(Optional.of(mockCustomer));
+        when(customerRepository.findById(2)).thenReturn(Optional.of(mockCustomer));
         when(productVariantRepository.findById(10)).thenReturn(Optional.of(mockVariant));
         when(orderRepository.countByCreatedAtAfter(any())).thenReturn(0L);
 
         Order savedOrder = new Order();
         savedOrder.setId(100);
         savedOrder.setOrderNumber("HD-20230101-002");
-        savedOrder.setCustomerId(1);
+        savedOrder.setCustomerId(2);
         savedOrder.setCustomerName("Nguyễn Văn A");
         savedOrder.setCreatedBy(1);
         savedOrder.setCreatedByUsername("testuser");
@@ -341,16 +341,16 @@ public class OrderServiceTest {
         mockReqDto.setPaidAmount(new BigDecimal("150000"));
 
         when(userRepository.findByUsername("testuser")).thenReturn(mockUser);
-        when(customerRepository.findById(1)).thenReturn(Optional.of(mockCustomer));
+        when(customerRepository.findById(2)).thenReturn(Optional.of(mockCustomer));
         when(productVariantRepository.findById(10)).thenReturn(Optional.of(mockVariant));
         when(orderRepository.countByCreatedAtAfter(any())).thenReturn(0L);
-        when(customerVoucherRepository.findUnusedVoucherByCustomerAndCode(1, "GIAM50K"))
+        when(customerVoucherRepository.findUnusedVoucherByCustomerAndCode(2, "GIAM50K"))
                 .thenReturn(Optional.of(mockCustomerVoucher));
 
         Order savedOrder = new Order();
         savedOrder.setId(100);
         savedOrder.setOrderNumber("HD-20230101-003");
-        savedOrder.setCustomerId(1);
+        savedOrder.setCustomerId(2);
         savedOrder.setTotalAmount(new BigDecimal("150000")); // 200k - 50k
         savedOrder.setPaidAmount(new BigDecimal("150000"));
         savedOrder.setChangeAmount(BigDecimal.ZERO);
