@@ -14,6 +14,7 @@ public class CareLogResponse {
     private Instant calledAt;
     private Instant nextRetryAt;
     private Instant createdAt;
+    private String potentialStatus;
 
     private CustomerInfo customer;
     private CampaignInfo campaign;

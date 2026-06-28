@@ -1,10 +1,12 @@
 package com.sapo.mock.clothing.customer.service.impl;
 
 import com.sapo.mock.clothing.customer.dto.request.campaigns.CareLogRequest;
+import com.sapo.mock.clothing.customer.dto.response.AiResultDto;
 import com.sapo.mock.clothing.customer.dto.response.CareLogListResponse;
 import com.sapo.mock.clothing.customer.dto.response.CareLogResponse;
 import com.sapo.mock.clothing.customer.dto.response.CustomerResponse;
 import com.sapo.mock.clothing.customer.repository.*;
+import com.sapo.mock.clothing.customer.service.AiAnalysisService;
 import com.sapo.mock.clothing.customer.service.CampaignService;
 import com.sapo.mock.clothing.entity.CareLog;
 import com.sapo.mock.clothing.entity.Customer;
@@ -45,6 +47,10 @@ public class CampaignServiceImpl implements CampaignService {
 
     @Autowired
     private CareCampaignRepository careCampaignRepository;
+
+    @Autowired
+    private AiAnalysisService aiAnalysisService; // Thêm dòng này
+
 
     @Value("${campaign.config.after-days:7}")
     private int afterDays;
@@ -118,7 +124,7 @@ public class CampaignServiceImpl implements CampaignService {
         return convertToCareLogResponse(careLog);
     }
 
-    @Override
+ /*   @Override
     @Transactional
     public void saveCareLog(CareLogRequest request, Integer userId) {
         Customer customer = customerRepository.findById(request.getCustomerId())
@@ -137,7 +143,68 @@ public class CampaignServiceImpl implements CampaignService {
         careLog.setCalledAt(Instant.now());
 
         careLogRepository.save(careLog);
-    }
+    }*/
+ @Override
+ @Transactional
+ public void saveCareLog(CareLogRequest request, Integer userId) {
+     Customer customer = customerRepository.findById(request.getCustomerId())
+             .orElseThrow(() -> new RuntimeException("Không tìm thấy khách hàng với ID: " + request.getCustomerId()));
+     User staff = userRepository.findById(userId)
+             .orElseThrow(() -> new RuntimeException("Không tìm thấy nhân viên hệ thống với ID: " + userId));
+     CareCampaign campaign = careCampaignRepository.findById(request.getCampaignId())
+             .orElseThrow(() -> new RuntimeException("Không tìm thấy chiến dịch với ID: " + request.getCampaignId()));
+
+     CareLog careLog = new CareLog();
+     careLog.setCustomer(customer);
+     careLog.setCalledBy(staff);
+     careLog.setCampaign(campaign);
+     careLog.setNote(request.getNote());
+     careLog.setNextRetryAt(request.getNextRetryAt());
+     careLog.setCalledAt(Instant.now());
+
+     // --- ĐOẠN XỬ LÝ AI ---
+     try {
+         AiResultDto aiResult = aiAnalysisService.analyzeNote(request.getNote());
+         
+         // Nếu Frontend gửi lên BO_TRONG (nghĩa là nhân viên không thèm chọn nút nào)
+         // Thì lấy kết quả do AI phân tích ra (NGHE_MAY, TU_CHOI...)
+         if (request.getResult() == null || "BO_TRONG".equals(request.getResult())) {
+             careLog.setResult(aiResult.getResult()); 
+         } else {
+             // Còn nếu nhân viên đã tự tay bấm vào nút "Nghe máy" trên giao diện rồi
+             // Thì tôn trọng lựa chọn đó, giữ nguyên không cho AI ghi đè
+             careLog.setResult(request.getResult());
+         }
+
+         // RIÊNG với trạng thái Tiềm năng/Không tiềm năng thì LUÔN LUÔN để AI tự phân tích và gán
+         careLog.setPotentialStatus(aiResult.getPotentialStatus()); 
+         
+         // Nếu AI đọc được thời gian gọi lại và nhân viên chưa tự chọn tay
+         if (aiResult.getNextRetryTime() != null && request.getNextRetryAt() == null) {
+             try {
+                 careLog.setNextRetryAt(Instant.parse(aiResult.getNextRetryTime()));
+             } catch (Exception e) {
+                 System.err.println("Lỗi parse ngày tháng từ AI: " + e.getMessage());
+             }
+         }
+         
+         // Dịch ngầm sang True/False để không làm hỏng giao diện cũ của Customer
+         if ("TIEM_NANG".equals(aiResult.getPotentialStatus())) {
+             customer.setIsPotential(true);
+         } else {
+             customer.setIsPotential(false);
+         }
+     } catch (Exception e) {
+         System.err.println("Gặp lỗi gọi AI: " + e.getMessage());
+         careLog.setResult("KHONG_XAC_DINH");
+         careLog.setPotentialStatus("KHONG_XAC_DINH");
+     }
+     // ---------------------
+
+     careLogRepository.save(careLog);
+     customerRepository.save(customer); // Lưu lại customer
+ }
+
 
     @Override
     @Transactional
@@ -161,12 +228,12 @@ public class CampaignServiceImpl implements CampaignService {
     }
 
     @Override
-    public Page<CareLogListResponse> searchCareLogs(String keyword, String result, Instant fromDate, Instant toDate, Pageable pageable) {
+    public Page<CareLogListResponse> searchCareLogs(String keyword, String result, String potentialStatus, Instant fromDate, Instant toDate, Pageable pageable) {
         String searchKeyword = (keyword != null && !keyword.trim().isEmpty()) ? keyword.trim() : null;
-        String searchResult = (result != null && !result.trim().isEmpty()) ? result.trim() : null;
+        String searchResult = (result != null && !result.trim().isEmpty()) ? result : null;
+        String searchPotentialStatus = (potentialStatus != null && !potentialStatus.trim().isEmpty()) ? potentialStatus : null;
 
-        // Gọi Repository mới với tham số searchKeyword
-        Page<CareLog> logs = careLogRepository.searchCareLogs(searchKeyword, searchResult, fromDate, toDate, pageable);
+        Page<CareLog> logs = careLogRepository.searchCareLogs(searchKeyword, searchResult, searchPotentialStatus, fromDate, toDate, pageable);
         return logs.map(this::convertToCareLogListResponse);
     }
 
@@ -222,6 +289,7 @@ public class CampaignServiceImpl implements CampaignService {
         CareLogListResponse res = new CareLogListResponse();
         res.setId(careLog.getId());
         res.setResult(careLog.getResult());
+        res.setPotentialStatus(careLog.getPotentialStatus());
         res.setCalledAt(careLog.getCalledAt());
         res.setCreatedAt(careLog.getCreatedAt());
 
@@ -256,6 +324,7 @@ public class CampaignServiceImpl implements CampaignService {
         CareLogResponse res = new CareLogResponse();
         res.setId(careLog.getId());
         res.setResult(careLog.getResult());
+        res.setPotentialStatus(careLog.getPotentialStatus());
         res.setNote(careLog.getNote());
         res.setScheduledAt(careLog.getScheduledAt());
         res.setCalledAt(careLog.getCalledAt());

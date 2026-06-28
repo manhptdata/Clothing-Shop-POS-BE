@@ -68,6 +68,8 @@ public class Customer {
     @Column(name = "email")
     private String email;
 
+    @Column(name = "is_potential", columnDefinition = "boolean default false")
+    private Boolean isPotential = false;
 
 
     @ManyToOne(fetch = FetchType.LAZY)

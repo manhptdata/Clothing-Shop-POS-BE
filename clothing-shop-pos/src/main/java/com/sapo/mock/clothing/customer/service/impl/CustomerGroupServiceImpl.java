@@ -36,6 +36,7 @@ public class CustomerGroupServiceImpl implements CustomerGroupService {
     private CustomerVoucherRepository customerVoucherRepository;
 
 
+
     // Retrieve all active customer groups.
     @Override
     public Page<CustomerGroupResponse> getGroupsWithPage(Pageable pageable) {

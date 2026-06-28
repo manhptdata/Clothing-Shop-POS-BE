@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -168,17 +169,16 @@ public class CampaignController {
      */
     @GetMapping("/care-logs/search")
     public ResponseEntity<RestResponse<Page<CareLogListResponse>>> searchCareLogs(
-            @RequestParam(required = false) String keyword, // Đổi từ phone -> keyword để đại diện cho cả Tên/SĐT
+            @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String result,
+            @RequestParam(required = false) String potentialStatus,
             @RequestParam(required = false) Instant fromDate,
             @RequestParam(required = false) Instant toDate,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-
-        Pageable pageable = PageRequest.of(page, size, org.springframework.data.domain.Sort.by("id").descending());
-
-        // Gọi service với keyword mới
-        Page<CareLogListResponse> searchResult = campaignService.searchCareLogs(keyword, result, fromDate, toDate, pageable);
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "calledAt"));
+        Page<CareLogListResponse> searchResult = campaignService.searchCareLogs(keyword, result, potentialStatus, fromDate, toDate, pageable);
 
         RestResponse<Page<CareLogListResponse>> response = new RestResponse<>(
                 HttpStatus.OK.value(),
