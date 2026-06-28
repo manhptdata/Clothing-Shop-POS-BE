@@ -36,6 +36,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+//hello just test cicd
+
 @ExtendWith(MockitoExtension.class)
 public class OrderServiceTest {
 
@@ -215,14 +217,15 @@ public class OrderServiceTest {
     void getAllOrders_Success() {
         Order order1 = new Order();
         order1.setId(100);
-        
+
         Order order2 = new Order();
         order2.setId(101);
 
         Pageable pageable = PageRequest.of(0, 5);
         Page<Order> page = new PageImpl<>(Arrays.asList(order1, order2), pageable, 2);
 
-        when(orderRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable))).thenReturn(page);
+        when(orderRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable)))
+                .thenReturn(page);
         when(orderLineItemRepository.findByOrderIdIn(anyList())).thenReturn(Collections.emptyList());
 
         ResultPaginationDTO result = orderService.getAllOrders(pageable, null);
@@ -231,7 +234,7 @@ public class OrderServiceTest {
         assertEquals(1, result.getMeta().getPage());
         assertEquals(5, result.getMeta().getPageSize());
         assertEquals(2, result.getMeta().getTotal());
-        
+
         List<ResOrderDTO> resList = (List<ResOrderDTO>) result.getResult();
         assertEquals(2, resList.size());
     }
@@ -341,7 +344,8 @@ public class OrderServiceTest {
         when(customerRepository.findById(1)).thenReturn(Optional.of(mockCustomer));
         when(productVariantRepository.findById(10)).thenReturn(Optional.of(mockVariant));
         when(orderRepository.countByCreatedAtAfter(any())).thenReturn(0L);
-        when(customerVoucherRepository.findUnusedVoucherByCustomerAndCode(1, "GIAM50K")).thenReturn(Optional.of(mockCustomerVoucher));
+        when(customerVoucherRepository.findUnusedVoucherByCustomerAndCode(1, "GIAM50K"))
+                .thenReturn(Optional.of(mockCustomerVoucher));
 
         Order savedOrder = new Order();
         savedOrder.setId(100);
@@ -363,7 +367,8 @@ public class OrderServiceTest {
         assertEquals(new BigDecimal("150000"), result.getTotalAmount());
         assertEquals("GIAM50K", result.getVoucherCode());
         assertEquals(new BigDecimal("50000"), result.getDiscountFromVoucher());
-        assertEquals(com.sapo.mock.clothing.util.constant.CustomerVoucherStatusEnum.USED, mockCustomerVoucher.getStatus());
+        assertEquals(com.sapo.mock.clothing.util.constant.CustomerVoucherStatusEnum.USED,
+                mockCustomerVoucher.getStatus());
 
         verify(customerVoucherRepository, times(1)).save(mockCustomerVoucher);
     }
