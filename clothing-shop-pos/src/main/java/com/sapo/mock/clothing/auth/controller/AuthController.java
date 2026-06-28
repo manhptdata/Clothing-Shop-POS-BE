@@ -22,7 +22,8 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Controller xử lý xác thực: đăng nhập, đăng xuất, refresh token, lấy thông tin tài khoản.
+ * Controller xử lý xác thực: đăng nhập, đăng xuất, refresh token, lấy thông tin
+ * tài khoản.
  */
 @RestController
 @RequestMapping("/api/auth")
@@ -34,13 +35,14 @@ public class AuthController {
     private final UserService userService;
 
     public AuthController(AuthenticationManagerBuilder authenticationManagerBuilder,
-                          SecurityUtil securityUtil,
-                          UserService userService) {
+            SecurityUtil securityUtil,
+            UserService userService) {
         this.authenticationManagerBuilder = authenticationManagerBuilder;
         this.securityUtil = securityUtil;
         this.userService = userService;
     }
 
+    //
     /**
      * Đăng nhập hệ thống.
      *
@@ -52,8 +54,8 @@ public class AuthController {
     @Operation(summary = "Đăng nhập", description = "Xác thực username + password, nhận JWT access token")
     public ResponseEntity<ResLoginDTO> login(@Valid @RequestBody ReqLoginDTO loginRequest) {
         // 1. Xác thực với Spring Security
-        UsernamePasswordAuthenticationToken authToken =
-            new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword());
+        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                loginRequest.getUsername(), loginRequest.getPassword());
         Authentication authentication = authenticationManagerBuilder.getObject().authenticate(authToken);
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
@@ -72,8 +74,8 @@ public class AuthController {
         ResponseCookie refreshTokenCookie = buildRefreshTokenCookie(refreshToken, 7 * 24 * 60 * 60);
 
         return ResponseEntity.ok()
-            .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
-            .body(responseDTO);
+                .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
+                .body(responseDTO);
     }
 
     /**
@@ -90,11 +92,10 @@ public class AuthController {
         User currentUser = userService.getUserByUsername(currentUsername);
 
         ResLoginDTO.UserLogin userLogin = new ResLoginDTO.UserLogin(
-            currentUser.getId(),
-            currentUser.getUsername(),
-            currentUser.getFullName(),
-            currentUser.getRole().name()
-        );
+                currentUser.getId(),
+                currentUser.getUsername(),
+                currentUser.getFullName(),
+                currentUser.getRole().name());
         return ResponseEntity.ok(new ResLoginDTO.UserGetAccount(userLogin));
     }
 
@@ -134,8 +135,8 @@ public class AuthController {
         ResponseCookie newCookie = buildRefreshTokenCookie(newRefreshToken, 7 * 24 * 60 * 60);
 
         return ResponseEntity.ok()
-            .header(HttpHeaders.SET_COOKIE, newCookie.toString())
-            .body(responseDTO);
+                .header(HttpHeaders.SET_COOKIE, newCookie.toString())
+                .body(responseDTO);
     }
 
     /**
@@ -154,8 +155,8 @@ public class AuthController {
         }
         ResponseCookie clearCookie = buildRefreshTokenCookie("", 0);
         return ResponseEntity.ok()
-            .header(HttpHeaders.SET_COOKIE, clearCookie.toString())
-            .build();
+                .header(HttpHeaders.SET_COOKIE, clearCookie.toString())
+                .build();
     }
 
     // ──── Helper methods ────
@@ -163,20 +164,19 @@ public class AuthController {
     private ResLoginDTO buildLoginResponse(User user) {
         ResLoginDTO dto = new ResLoginDTO();
         dto.setUser(new ResLoginDTO.UserLogin(
-            user.getId(),
-            user.getUsername(),
-            user.getFullName(),
-            user.getRole().name()
-        ));
+                user.getId(),
+                user.getUsername(),
+                user.getFullName(),
+                user.getRole().name()));
         return dto;
     }
 
     private ResponseCookie buildRefreshTokenCookie(String value, long maxAge) {
         return ResponseCookie.from("refresh_token", value)
-            .httpOnly(true)
-            .secure(true)
-            .path("/")
-            .maxAge(maxAge)
-            .build();
+                .httpOnly(true)
+                .secure(true)
+                .path("/")
+                .maxAge(maxAge)
+                .build();
     }
 }
