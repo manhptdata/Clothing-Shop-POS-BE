@@ -224,8 +224,8 @@ public class OrderService {
         return mapToResOrderDTO(order, items);
     }
 
-    public ResultPaginationDTO getAllOrders(Pageable pageable, OrderStatus status) {
-        Specification<Order> spec = OrderSpecification.build(status);
+    public ResultPaginationDTO getAllOrders(Pageable pageable, OrderStatus status, String keyword) {
+        Specification<Order> spec = OrderSpecification.build(status, keyword);
         Page<Order> pageOrder = orderRepository.findAll(spec, pageable);
         ResultPaginationDTO rs = new ResultPaginationDTO();
         ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();

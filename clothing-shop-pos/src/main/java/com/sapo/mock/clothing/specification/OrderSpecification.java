@@ -12,12 +12,19 @@ import jakarta.persistence.criteria.Predicate;
 
 public class OrderSpecification {
 
-	public static Specification<Order> build(OrderStatus status) {
+	public static Specification<Order> build(OrderStatus status, String keyword) {
 		return (root, query, cb) -> {
 			List<Predicate> predicates = new ArrayList<>();
 
 			if (status != null) {
 				predicates.add(cb.equal(root.get("status"), status));
+			}
+
+			if (keyword != null && !keyword.trim().isEmpty()) {
+				String likePattern = "%" + keyword.trim().toLowerCase() + "%";
+				Predicate codeLike = cb.like(cb.lower(root.get("orderNumber")), likePattern);
+				Predicate customerLike = cb.like(cb.lower(root.get("customerName")), likePattern);
+				predicates.add(cb.or(codeLike, customerLike));
 			}
 
 			return cb.and(predicates.toArray(new Predicate[0]));

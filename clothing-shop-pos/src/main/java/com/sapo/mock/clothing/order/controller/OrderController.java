@@ -44,8 +44,9 @@ public class OrderController {
     @ApiMessage("Lấy danh sách đơn hàng thành công")
     public ResponseEntity<ResultPaginationDTO> getAllOrders(
             Pageable pageable,
-            @RequestParam(required = false) com.sapo.mock.clothing.util.constant.OrderStatus status) {
-        ResultPaginationDTO rs = orderService.getAllOrders(pageable, status);
+            @RequestParam(required = false) com.sapo.mock.clothing.util.constant.OrderStatus status,
+            @RequestParam(required = false) String search) {
+        ResultPaginationDTO rs = orderService.getAllOrders(pageable, status, search);
         return ResponseEntity.ok(rs);
     }
 

@@ -228,7 +228,7 @@ public class OrderServiceTest {
                 .thenReturn(page);
         when(orderLineItemRepository.findByOrderIdIn(anyList())).thenReturn(Collections.emptyList());
 
-        ResultPaginationDTO result = orderService.getAllOrders(pageable, null);
+        ResultPaginationDTO result = orderService.getAllOrders(pageable, null, null);
 
         assertNotNull(result);
         assertEquals(1, result.getMeta().getPage());
