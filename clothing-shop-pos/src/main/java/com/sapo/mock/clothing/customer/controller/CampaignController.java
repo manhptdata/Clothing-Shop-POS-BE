@@ -106,9 +106,11 @@ public class CampaignController {
     public ResponseEntity<RestResponse<Void>> createCareLog(
             @jakarta.validation.Valid @RequestBody CareLogRequest request) {
 
-        // Tạm thời gán cứng ID nhân viên bằng 1 do đang chạy Mock dự án chưa làm Security hoàn thiện.
-        // Sau này khi tích hợp Token, bạn chỉ cần lấy ID từ Context của Spring Security ra là xong.
-        Integer currentUserId = 1;
+        // Lấy ID nhân viên từ Context của Spring Security
+        Integer currentUserId = com.sapo.mock.clothing.util.SecurityUtil.getCurrentUserId();
+        if (currentUserId == null) {
+            currentUserId = 1; // Fallback an toàn nếu test API không có token
+        }
 
         campaignService.saveCareLog(request, currentUserId);
 

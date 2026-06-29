@@ -19,17 +19,17 @@ public interface CampaignRepository extends JpaRepository<Customer, Integer> {
     @Query("SELECT DISTINCT c FROM Customer c " +
             "JOIN Order o ON c.id = o.customerId " +
             "WHERE o.status = com.sapo.mock.clothing.util.constant.OrderStatus.COMPLETED " +
-            "AND o.createdAt >= :startTime AND o.createdAt <= :endTime " +
+            "AND o.createdAt <= :endTime " +
+            "AND o.createdAt >= :thirtyDaysAgo " +
             "AND c.status = com.sapo.mock.clothing.util.constant.CustomerStatusEnum.ACTIVE " +
             "AND c.id NOT IN (" +
             "    SELECT cl.customer.id FROM CareLog cl " +
             "    WHERE cl.campaign.type = 'AFTER_7_DAYS' " +
-            "    AND cl.calledAt >= :todayStart" +
+            "    AND cl.calledAt >= o.createdAt" +
             ")")
     Page<Customer> findCustomersAfter7DaysBuy(
-            @Param("startTime") Instant startTime,
             @Param("endTime") Instant endTime,
-            @Param("todayStart") Instant todayStart, // Thêm mốc đầu ngày hôm nay để chặn trùng
+            @Param("thirtyDaysAgo") Instant thirtyDaysAgo,
             Pageable pageable
     );
 
@@ -40,6 +40,7 @@ public interface CampaignRepository extends JpaRepository<Customer, Integer> {
      */
     @Query("SELECT c FROM Customer c " +
             "WHERE c.status = com.sapo.mock.clothing.util.constant.CustomerStatusEnum.ACTIVE " +
+            "AND c.createdAt <= :thirtyDaysAgo " +
             "AND c.id NOT IN (" +
             "    SELECT DISTINCT o.customerId FROM Order o " +
             "    WHERE o.status = com.sapo.mock.clothing.util.constant.OrderStatus.COMPLETED " +
@@ -63,8 +64,10 @@ public interface CampaignRepository extends JpaRepository<Customer, Integer> {
             "JOIN CareLog log ON c = log.customer " +
             "WHERE log.nextRetryAt >= :startTime AND log.nextRetryAt <= :endTime " +
             "AND c.status = com.sapo.mock.clothing.util.constant.CustomerStatusEnum.ACTIVE " +
-            "AND log.id NOT IN (" +
-            "    SELECT cl.id FROM CareLog cl WHERE cl.calledAt > log.nextRetryAt" +
+            "AND c.id NOT IN (" +
+            "    SELECT cl.customer.id FROM CareLog cl " +
+            "    WHERE cl.campaign.type = 'RECALL_SCHEDULE' " +
+            "    AND cl.calledAt >= :startTime" +
             ")")
     Page<Customer> findCustomersRecallSchedule(
             @Param("startTime") Instant startTime,

@@ -69,10 +69,10 @@ public class CampaignServiceImpl implements CampaignService {
         switch (type) {
             case AFTER_7_DAYS:
                 LocalDate targetDate = today.minusDays(afterDays);
-                Instant start7Days = targetDate.atStartOfDay(ZoneId.systemDefault()).toInstant();
                 Instant end7Days = targetDate.atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
-                // Truyền thêm biến todayStart vào hàm
-                customers = campaignRepository.findCustomersAfter7DaysBuy(start7Days, end7Days, todayStart, pageable);
+                LocalDate thirtyDaysAgoDateFor7Days = today.minusDays(noBuyDays);
+                Instant thirtyDaysAgoFor7Days = thirtyDaysAgoDateFor7Days.atStartOfDay(ZoneId.systemDefault()).toInstant();
+                customers = campaignRepository.findCustomersAfter7DaysBuy(end7Days, thirtyDaysAgoFor7Days, pageable);
                 break;
 
             case LONG_TIME_NO_BUY:
@@ -163,40 +163,39 @@ public class CampaignServiceImpl implements CampaignService {
      careLog.setCalledAt(Instant.now());
 
      // --- ĐOẠN XỬ LÝ AI ---
-     try {
-         AiResultDto aiResult = aiAnalysisService.analyzeNote(request.getNote());
-         
-         // Nếu Frontend gửi lên BO_TRONG (nghĩa là nhân viên không thèm chọn nút nào)
-         // Thì lấy kết quả do AI phân tích ra (NGHE_MAY, TU_CHOI...)
-         if (request.getResult() == null || "BO_TRONG".equals(request.getResult())) {
-             careLog.setResult(aiResult.getResult()); 
-         } else {
-             // Còn nếu nhân viên đã tự tay bấm vào nút "Nghe máy" trên giao diện rồi
-             // Thì tôn trọng lựa chọn đó, giữ nguyên không cho AI ghi đè
-             careLog.setResult(request.getResult());
-         }
+     if (request.getResult() == null || "BO_TRONG".equals(request.getResult())) {
+         try {
+             AiResultDto aiResult = aiAnalysisService.analyzeNote(request.getNote());
+             
+             careLog.setResult(aiResult.getResult());
 
-         // RIÊNG với trạng thái Tiềm năng/Không tiềm năng thì LUÔN LUÔN để AI tự phân tích và gán
-         careLog.setPotentialStatus(aiResult.getPotentialStatus()); 
-         
-         // Nếu AI đọc được thời gian gọi lại và nhân viên chưa tự chọn tay
-         if (aiResult.getNextRetryTime() != null && request.getNextRetryAt() == null) {
-             try {
-                 careLog.setNextRetryAt(Instant.parse(aiResult.getNextRetryTime()));
-             } catch (Exception e) {
-                 System.err.println("Lỗi parse ngày tháng từ AI: " + e.getMessage());
+             // RIÊNG với trạng thái Tiềm năng/Không tiềm năng thì LUÔN LUÔN để AI tự phân tích và gán
+             careLog.setPotentialStatus(aiResult.getPotentialStatus()); 
+             
+             // Nếu AI đọc được thời gian gọi lại và nhân viên chưa tự chọn tay
+             if (aiResult.getNextRetryTime() != null && request.getNextRetryAt() == null) {
+                 try {
+                     careLog.setNextRetryAt(Instant.parse(aiResult.getNextRetryTime()));
+                 } catch (Exception e) {
+                     System.err.println("Lỗi parse ngày tháng từ AI: " + e.getMessage());
+                 }
              }
+             
+             // Dịch ngầm sang True/False để không làm hỏng giao diện cũ của Customer
+             if ("TIEM_NANG".equals(aiResult.getPotentialStatus())) {
+                 customer.setIsPotential(true);
+             } else {
+                 customer.setIsPotential(false);
+             }
+         } catch (Exception e) {
+             System.err.println("Gặp lỗi gọi AI: " + e.getMessage());
+             careLog.setResult("KHONG_XAC_DINH");
+             careLog.setPotentialStatus("KHONG_XAC_DINH");
          }
-         
-         // Dịch ngầm sang True/False để không làm hỏng giao diện cũ của Customer
-         if ("TIEM_NANG".equals(aiResult.getPotentialStatus())) {
-             customer.setIsPotential(true);
-         } else {
-             customer.setIsPotential(false);
-         }
-     } catch (Exception e) {
-         System.err.println("Gặp lỗi gọi AI: " + e.getMessage());
-         careLog.setResult("KHONG_XAC_DINH");
+     } else {
+         // KHI KHÔNG DÙNG AI (TỰ CHỌN KẾT QUẢ)
+         // KHÔNG MANG GHI CHÚ ĐI PHÂN TÍCH
+         careLog.setResult(request.getResult());
          careLog.setPotentialStatus("KHONG_XAC_DINH");
      }
      // ---------------------

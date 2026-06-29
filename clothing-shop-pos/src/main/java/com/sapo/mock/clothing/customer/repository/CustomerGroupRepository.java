@@ -60,7 +60,7 @@ public interface CustomerGroupRepository extends JpaRepository<CustomerGroup, In
             "WHERE cg.status = :status " +
             "AND cg.minSpending IS NOT NULL " +
             "AND :totalSpent >= cg.minSpending " +
-            "AND (cg.maxSpending IS NULL OR :totalSpent < cg.maxSpending) " +
+            "AND (cg.maxSpending IS NULL OR :totalSpent <= cg.maxSpending) " +
             "ORDER BY cg.minSpending DESC")
     List<CustomerGroup> findSuitableGroup(
             @Param("totalSpent") BigDecimal totalSpent,

@@ -42,12 +42,15 @@ public class AiAnalysisServiceImpl implements AiAnalysisService {
         try {
             String url = apiUrl;
 
-            String currentDateTime = java.time.Instant.now().toString();
+            java.time.ZoneId vnZone = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
+            java.time.ZonedDateTime vnTime = java.time.ZonedDateTime.now(vnZone);
+            String currentDateTimeVn = vnTime.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX"));
+            
             String systemInstruction = "Bạn là hệ thống CRM phân tích cuộc gọi cho cửa hàng quần áo Sapo.\n"
                     + "Nhiệm vụ của bạn là đọc ghi chú (note) cuộc gọi và phân loại thành 3 thông tin:\n"
-                    + "1. result: Thuộc 1 trong các giá trị: GOI_NHO, TU_CHOI, NGHE_MAY, HEN_GOI_LAI.\n" // --- ĐÃ BỎ DA_MUA_HANG TẠI ĐÂY ---
+                    + "1. result: Thuộc 1 trong các giá trị: GOI_NHO, TU_CHOI, NGHE_MAY, HEN_GOI_LAI.\n" 
                     + "2. potential_status: Phân loại thái độ khách hàng, bắt buộc trả về đúng 1 trong 3 giá trị sau: 'TIEM_NANG' (quan tâm, hỏi giá, muốn xem đồ, chốt đơn), 'KHONG_TIEM_NANG' (từ chối, sai số, gắt gỏng, thuê bao), 'MONG_LUNG' (khách nghe máy nhưng lấp lửng, chưa rõ ràng).\n"
-                    + "3. nextRetryTime: Nếu khách hẹn gọi lại (ví dụ chiều nay, mai lúc 3h), hãy ước lượng thời gian gọi lại theo chuẩn ISO-8601 (ví dụ 2026-06-28T15:00:00Z). Giờ hiện tại của hệ thống đang là " + currentDateTime + " (Múi giờ UTC). Hãy quy đổi ra giờ hẹn nếu có. Nếu không có hẹn, trả về null.\n"
+                    + "3. nextRetryTime: Nếu khách hẹn gọi lại (ví dụ chiều nay, mai lúc 3h), hãy ước lượng thời gian gọi lại theo chuẩn ISO-8601 múi giờ UTC (ví dụ 2026-06-28T08:00:00Z). Giờ hiện tại của nhân viên đang là " + currentDateTimeVn + " (Múi giờ Việt Nam UTC+7). Lưu ý: Khi tính toán xong giờ Việt Nam, PHẢI đổi ngược sang UTC (trừ đi 7 tiếng) để trả về hệ thống. Nếu không có hẹn, trả về null.\n"
                     + "Yêu cầu bắt buộc trả về ĐÚNG định dạng JSON cấu trúc sau, không giải thích gì thêm:\n"
                     + "{\"result\": \"chuỗi_kết_quả\", \"potential_status\": \"TIEM_NANG_hoac_MONG_LUNG\", \"nextRetryTime\": \"chuỗi_ISO8601_hoac_null\"}\n\n"
                     + "Nội dung ghi chú cần phân tích: " + note;
