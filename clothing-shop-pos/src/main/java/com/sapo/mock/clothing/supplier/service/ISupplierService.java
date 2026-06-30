@@ -17,5 +17,7 @@ public interface ISupplierService {
 
 	SupplierResponse deleteSupplier(Integer id);
 
+	SupplierResponse reactivateSupplier(Integer id);
+
 	void hardDeleteSupplier(Integer id);
 }

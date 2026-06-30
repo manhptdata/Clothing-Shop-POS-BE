@@ -118,6 +118,21 @@ public class SupplierService implements ISupplierService {
 
 	@Override
 	@Transactional
+	public SupplierResponse reactivateSupplier(Integer id) {
+		Supplier supplier = supplierRepository.findById(id)
+				.orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Nhà cung cấp"));
+
+		if (supplier.isActive()) {
+			throw new BadRequestException("Nhà cung cấp này đang hoạt động");
+		}
+
+		supplier.setActive(true);
+		supplierRepository.save(supplier);
+		return toResponse(supplier);
+	}
+
+	@Override
+	@Transactional
 	public void hardDeleteSupplier(Integer id) {
 		Supplier supplier = supplierRepository.findById(id)
 				.orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Nhà cung cấp"));

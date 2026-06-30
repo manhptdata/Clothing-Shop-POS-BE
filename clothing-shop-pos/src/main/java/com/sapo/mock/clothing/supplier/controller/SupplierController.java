@@ -70,6 +70,14 @@ public class SupplierController {
 		return ResponseEntity.ok(response);
 	}
 
+	@PutMapping("/{id}/reactivate")
+	public ResponseEntity<RestResponse<SupplierResponse>> reactivateSupplier(@PathVariable Integer id) {
+		SupplierResponse supplier = supplierService.reactivateSupplier(id);
+		RestResponse<SupplierResponse> response = new RestResponse<>(200, null,
+				"Kích hoạt lại nhà cung cấp thành công", supplier);
+		return ResponseEntity.ok(response);
+	}
+
 	@DeleteMapping("/{id}/permanent")
 	public ResponseEntity<RestResponse<Void>> hardDeleteSupplier(@PathVariable Integer id) {
 		supplierService.hardDeleteSupplier(id);
