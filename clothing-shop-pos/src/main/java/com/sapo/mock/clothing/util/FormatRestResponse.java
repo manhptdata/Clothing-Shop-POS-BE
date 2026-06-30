@@ -22,6 +22,10 @@ public class FormatRestResponse implements ResponseBodyAdvice<Object> {
     @Override
     public boolean supports(MethodParameter returnType,
             Class<? extends HttpMessageConverter<?>> converterType) {
+        String packageName = returnType.getDeclaringClass().getPackageName();
+        if (packageName.startsWith("org.springframework.boot.actuate")) {
+            return false;
+        }
         return true;
     }
 
