@@ -71,6 +71,17 @@ public class SecurityConfiguration {
 				.authorizeHttpRequests(authz -> authz.requestMatchers(WHITE_LIST).permitAll()
 						.requestMatchers("/api/admin/**").hasRole("ADMIN").anyRequest().authenticated())
 				.oauth2ResourceServer(oauth2 -> oauth2
+						.bearerTokenResolver(request -> {
+							String bearerToken = request.getHeader("Authorization");
+							if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+								return bearerToken.substring(7);
+							}
+							String tokenParam = request.getParameter("token");
+							if (tokenParam != null && !tokenParam.trim().isEmpty()) {
+								return tokenParam;
+							}
+							return null;
+						})
 						.jwt(jwt -> jwt.decoder(jwtDecoder()).jwtAuthenticationConverter(jwtAuthenticationConverter()))
 						.authenticationEntryPoint(customAuthenticationEntryPoint))
 				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));

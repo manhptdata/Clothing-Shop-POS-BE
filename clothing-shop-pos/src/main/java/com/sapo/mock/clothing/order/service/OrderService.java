@@ -48,6 +48,7 @@ public class OrderService {
     private final PointHistoryRepository pointHistoryRepository;
     private final com.sapo.mock.clothing.customer.repository.CustomerVoucherRepository customerVoucherRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final com.sapo.mock.clothing.notification.service.NotificationService notificationService;
 
     @Transactional
     public ResOrderDTO createOrder(ReqCreateOrderDTO dto, String username) {
@@ -211,6 +212,7 @@ public class OrderService {
             }
 
             eventPublisher.publishEvent(new OrderCompletedEvent(savedOrder.getCustomerId(), savedOrder.getTotalAmount()));
+            this.sendOrderNotifications(savedOrder, dto.getPaymentMethod());
         }
 
         return mapToResOrderDTO(savedOrder, lineItems);
@@ -439,6 +441,7 @@ public class OrderService {
             }
 
             eventPublisher.publishEvent(new OrderCompletedEvent(savedOrder.getCustomerId(), savedOrder.getTotalAmount()));
+            this.sendOrderNotifications(savedOrder, dto.getPaymentMethod());
         }
 
         return mapToResOrderDTO(savedOrder, lineItems);
@@ -566,7 +569,74 @@ public class OrderService {
             }
 
             variant.setQuantity(variant.getQuantity() - itemDto.getQuantity());
-            productVariantRepository.save(variant);
+            ProductVariant savedVariant = productVariantRepository.save(variant);
+
+            // Gửi cảnh báo tồn kho chạm ngưỡng tối thiểu
+            if (savedVariant.getQuantity() <= savedVariant.getLowStockThreshold()) {
+                try {
+                    Notification lowStockAlert = new Notification();
+                    lowStockAlert.setTitle("Cảnh báo tồn kho chạm ngưỡng");
+
+                    String fullName = savedVariant.getProduct().getName();
+                    List<String> options = new ArrayList<>();
+                    if (savedVariant.getOption1Value() != null) options.add(savedVariant.getOption1Value().getValue());
+                    if (savedVariant.getOption2Value() != null) options.add(savedVariant.getOption2Value().getValue());
+                    if (savedVariant.getOption3Value() != null) options.add(savedVariant.getOption3Value().getValue());
+                    if (!options.isEmpty()) {
+                        fullName += " (" + String.join(" - ", options) + ")";
+                    }
+
+                    String msg = String.format("Cảnh báo: Mặt hàng [%s] %s đã chạm ngưỡng tồn kho tối thiểu (Còn %d chiếc). Đề xuất nhân viên kho nhập thêm hàng.",
+                            savedVariant.getSku(), fullName, savedVariant.getQuantity());
+                    lowStockAlert.setMessage(msg);
+                    lowStockAlert.setType("LOW_STOCK");
+                    lowStockAlert.setTargetRole("ROLE_WH");
+                    lowStockAlert.setMetadata(String.format("{\"variantId\":%d,\"sku\":\"%s\",\"quantity\":%d}",
+                            savedVariant.getId(), savedVariant.getSku(), savedVariant.getQuantity()));
+
+                    notificationService.sendNotification(lowStockAlert);
+                } catch (Exception e) {
+                    System.err.println("Lỗi gửi thông báo tồn kho: " + e.getMessage());
+                }
+            }
+        }
+    }
+
+    private void sendOrderNotifications(Order savedOrder, String paymentMethod) {
+        try {
+            String payMethod = "QR_PAYOS".equals(paymentMethod) ? "Chuyển khoản" : "Tiền mặt";
+            String customerNameName = savedOrder.getCustomerName();
+            if (customerNameName == null || customerNameName.trim().isEmpty() || customerNameName.contains("Khách lẻ")) {
+                customerNameName = "Khách lẻ";
+            }
+
+            java.text.DecimalFormatSymbols symbols = new java.text.DecimalFormatSymbols(java.util.Locale.US);
+            java.text.DecimalFormat df = new java.text.DecimalFormat("#,###", symbols);
+            String amountFormatted = df.format(savedOrder.getTotalAmount()) + " VND";
+
+            // 1. Notification: Order created
+            Notification createNotif = new Notification();
+            createNotif.setTitle("Đơn hàng mới");
+            createNotif.setMessage(String.format("Đơn hàng %s được mua bởi %s qua nguồn đơn POS",
+                    savedOrder.getOrderNumber(), customerNameName));
+            createNotif.setType("ORDER_CREATED");
+            createNotif.setTargetRole("ROLE_ADMIN");
+            createNotif.setMetadata(String.format("{\"orderId\":%d,\"orderNumber\":\"%s\"}",
+                    savedOrder.getId(), savedOrder.getOrderNumber()));
+            notificationService.sendNotification(createNotif);
+
+            // 2. Notification: Payment successful
+            Notification paidNotif = new Notification();
+            paidNotif.setTitle("Thanh toán thành công");
+            paidNotif.setMessage(String.format("Đơn hàng %s được thanh toán %s thành công bằng phương thức %s",
+                    savedOrder.getOrderNumber(), amountFormatted, payMethod));
+            paidNotif.setType("ORDER_PAID");
+            paidNotif.setTargetRole("ROLE_ADMIN");
+            paidNotif.setMetadata(String.format("{\"orderId\":%d,\"orderNumber\":\"%s\"}",
+                    savedOrder.getId(), savedOrder.getOrderNumber()));
+            notificationService.sendNotification(paidNotif);
+        } catch (Exception e) {
+            System.err.println("Lỗi gửi thông báo đơn hàng mới: " + e.getMessage());
         }
     }
 }

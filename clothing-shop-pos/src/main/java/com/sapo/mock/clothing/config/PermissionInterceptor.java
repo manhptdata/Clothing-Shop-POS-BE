@@ -28,6 +28,11 @@ public class PermissionInterceptor implements HandlerInterceptor {
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response,
             Object handler) throws Exception {
 
+        String requestURI = request.getRequestURI();
+        if (requestURI.startsWith("/api/notifications") || requestURI.startsWith("/api/shifts")) {
+            return true;
+        }
+
         String currentUsername = SecurityUtil.getCurrentUserLogin().orElse("");
         if (currentUsername.isEmpty()) {
             return true; // Chưa đăng nhập → để SecurityFilterChain xử lý
@@ -42,7 +47,6 @@ public class PermissionInterceptor implements HandlerInterceptor {
         }
 
         RoleEnum role = currentUser.getRole();
-        String requestURI = request.getRequestURI();
 
         // ROLE_ADMIN: Full access
         if (role == RoleEnum.ROLE_ADMIN) {
