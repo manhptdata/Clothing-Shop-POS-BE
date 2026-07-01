@@ -20,5 +20,6 @@ public class AIController {
         }
         int days = (request.getDays() != null && request.getDays() > 0) ? request.getDays() : 30;
         return ResponseEntity.ok(geminiService.analyzeInventory(prompt, days));
+        // return ResponseEntity.ok(geminiService.analyzeInventoryOld(prompt, days));
     }
 }
