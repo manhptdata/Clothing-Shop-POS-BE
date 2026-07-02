@@ -40,7 +40,7 @@ public class FormatRestResponse implements ResponseBodyAdvice<Object> {
         int statusCode = servletResponse.getStatus();
 
         String path = request.getURI().getPath();
-        if (path.startsWith("/v3/api-docs") || path.startsWith("/swagger-ui")) {
+        if (path.startsWith("/v3/api-docs") || path.startsWith("/swagger-ui") || path.startsWith("/api/v1/payments")) {
             return body;
         }
 

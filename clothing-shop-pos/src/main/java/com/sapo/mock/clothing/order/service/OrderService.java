@@ -408,7 +408,7 @@ public class OrderService {
 
     private void sendOrderNotifications(Order savedOrder, String paymentMethod) {
         try {
-            String payMethod = "QR_PAYOS".equals(paymentMethod) ? "Chuyển khoản" : "Tiền mặt";
+            String payMethod = "QR_SEPAY".equals(paymentMethod) ? "Chuyển khoản" : "Tiền mặt";
             String customerName = savedOrder.getCustomerName();
             if (customerName == null || customerName.trim().isEmpty() || customerName.contains("Khách lẻ")) customerName = "Khách lẻ";
 
@@ -427,11 +427,62 @@ public class OrderService {
             paidNotif.setTitle("Thanh toán thành công");
             paidNotif.setMessage(String.format("Đơn hàng %s được thanh toán %s thành công bằng phương thức %s", savedOrder.getOrderNumber(), amountFormatted, payMethod));
             paidNotif.setType("ORDER_PAID");
-            paidNotif.setTargetRole("ROLE_ADMIN");
             paidNotif.setMetadata(String.format("{\"orderId\":%d,\"orderNumber\":\"%s\"}", savedOrder.getId(), savedOrder.getOrderNumber()));
             notificationService.sendNotification(paidNotif);
         } catch (Exception e) {
             System.err.println("Lỗi gửi thông báo đơn hàng mới: " + e.getMessage());
+        }
+    }
+
+    @Transactional
+    public void completeOrderPayment(String orderNumber, BigDecimal paidAmount) {
+        Order order = orderRepository.findByOrderNumber(orderNumber)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng: " + orderNumber));
+
+        if (order.getStatus() != OrderStatus.PENDING) {
+            return; 
+        }
+
+        if (paidAmount.compareTo(order.getTotalAmount()) < 0) {
+            sendPaymentFailureNotification(order, paidAmount);
+            throw new BadRequestException("Số tiền thanh toán không đủ");
+        }
+
+        order.setStatus(OrderStatus.COMPLETED);
+        order.setPaidAmount(paidAmount);
+        order.setChangeAmount(paidAmount.subtract(order.getTotalAmount()));
+        order.setPointsEarned(order.getCustomerId() == 1 ? 0 : order.getTotalAmount().divideToIntegralValue(PointConstant.EARN_RATE).intValue());
+        
+        Order savedOrder = orderRepository.save(order);
+
+        Customer customer = getCustomerById(savedOrder.getCustomerId());
+        
+        com.sapo.mock.clothing.entity.CustomerVoucher appliedVoucher = null;
+        if (savedOrder.getVoucherCode() != null && !savedOrder.getVoucherCode().trim().isEmpty()) {
+            appliedVoucher = customerVoucherRepository
+                    .findUnusedVoucherByCustomerAndCode(customer.getId(), savedOrder.getVoucherCode().trim())
+                    .orElse(null);
+        }
+
+        processOrderCompletion(savedOrder, customer, appliedVoucher, "QR_SEPAY");
+    }
+
+    private void sendPaymentFailureNotification(Order order, BigDecimal paidAmount) {
+        try {
+            java.text.DecimalFormat df = new java.text.DecimalFormat("#,###", new java.text.DecimalFormatSymbols(java.util.Locale.US));
+            String paidFormatted = df.format(paidAmount) + " VND";
+            String totalFormatted = df.format(order.getTotalAmount()) + " VND";
+
+            Notification failNotif = new Notification();
+            failNotif.setTitle("Thanh toán thiếu tiền");
+            failNotif.setMessage(String.format("Cảnh báo: Đơn hàng %s chuyển thiếu tiền! Khách chuyển %s, cần thanh toán %s.", 
+                    order.getOrderNumber(), paidFormatted, totalFormatted));
+            failNotif.setType("SYSTEM");
+            failNotif.setMetadata(String.format("{\"orderNumber\":\"%s\",\"type\":\"PAYMENT_INSUFFICIENT\",\"paidAmount\":%s,\"totalAmount\":%s}", 
+                    order.getOrderNumber(), paidAmount.toString(), order.getTotalAmount().toString()));
+            notificationService.sendNotification(failNotif);
+        } catch (Exception e) {
+            System.err.println("Lỗi gửi thông báo thanh toán thiếu: " + e.getMessage());
         }
     }
 
