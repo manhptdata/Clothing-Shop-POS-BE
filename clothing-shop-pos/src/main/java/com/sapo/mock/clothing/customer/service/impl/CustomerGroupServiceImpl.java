@@ -177,6 +177,9 @@ public class CustomerGroupServiceImpl implements CustomerGroupService {
             customer.setCustomerGroup(suitableGroup);
         }
         customerRepository.saveAll(customers);
+    }    @Override
+    public Page<com.sapo.mock.clothing.customer.dto.response.CustomerVoucherHistoryResponse> getVoucherHistory(String keyword, Pageable pageable) {
+        String cleanKeyword = (keyword != null && !keyword.trim().isEmpty()) ? keyword.trim() : null;
+        return customerVoucherRepository.searchHistory(cleanKeyword, pageable);
     }
-
 }

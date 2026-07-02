@@ -23,7 +23,5 @@ public interface CustomerGroupService {
     // Đồng bộ hạng cho tất cả khách hàng
     void syncAllCustomerRanks();
 
-
-
-
+    Page<com.sapo.mock.clothing.customer.dto.response.CustomerVoucherHistoryResponse> getVoucherHistory(String keyword, Pageable pageable);
 }
