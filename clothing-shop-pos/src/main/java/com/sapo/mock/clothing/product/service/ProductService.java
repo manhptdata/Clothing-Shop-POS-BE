@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
@@ -260,6 +261,19 @@ public class ProductService implements IProductService {
 		if (requests == null)
 			return;
 
+		Set<String> requestSkus = requests.stream()
+				.map(r -> r.getSku() != null ? r.getSku().trim().toUpperCase() : "")
+				.filter(s -> !s.isEmpty())
+				.collect(Collectors.toSet());
+
+		product.getVariants().forEach(v -> {
+			if (!requestSkus.contains(v.getSku().trim().toUpperCase())) {
+				v.setIsActive(false);
+			} else {
+				v.setIsActive(true);
+			}
+		});
+
 		for (ProductVariantRequest vReq : requests) {
 			String reqSku = vReq.getSku() != null ? vReq.getSku().trim() : "";
 
@@ -382,7 +396,8 @@ public class ProductService implements IProductService {
 		}
 
 		if (product.getVariants() != null && !product.getVariants().isEmpty()) {
-			List<ProductVariantResponse> variantDtos = product.getVariants().stream().map(v -> {
+			List<ProductVariantResponse> variantDtos = product.getVariants().stream()
+					.map(v -> {
 				ProductVariantResponse vRes = new ProductVariantResponse();
 				vRes.setId(v.getId());
 				vRes.setSku(v.getSku());
@@ -397,6 +412,7 @@ public class ProductService implements IProductService {
 				vRes.setLowStockThreshold(v.getLowStockThreshold());
 				vRes.setQuantity(v.getQuantity());
 				vRes.setImageUrl(v.getImageUrl());
+				vRes.setIsActive(v.getIsActive());
 				return vRes;
 			}).collect(Collectors.toList());
 			response.setVariants(variantDtos);

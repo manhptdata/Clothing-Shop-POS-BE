@@ -58,4 +58,7 @@ public class ProductVariant {
 
 	@Column(name = "quantity", nullable = false)
 	private Integer quantity = 0;
+
+	@Column(name = "is_active", nullable = false)
+	private Boolean isActive = true;
 }

@@ -18,4 +18,5 @@ public class ProductVariantResponse {
 	private Integer lowStockThreshold;
 	private Integer quantity;
 	private String imageUrl;
+	private Boolean isActive;
 }

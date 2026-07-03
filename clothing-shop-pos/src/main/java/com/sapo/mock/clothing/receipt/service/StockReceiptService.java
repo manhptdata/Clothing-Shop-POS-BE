@@ -78,6 +78,10 @@ public class StockReceiptService implements IStockReceiptService {
 			ProductVariant variant = variantRepository.findById(itemReq.getVariantId())
 					.orElseThrow(() -> new ResourceNotFoundException("không tìm thấy variant sản phẩm"));
 
+			if (!variant.getIsActive()) {
+				throw new BadRequestException("Biến thể '" + variant.getSku() + "' đã bị vô hiệu hóa, không thể nhập kho.");
+			}
+
 			StockReceiptItem item = new StockReceiptItem();
 			item.setReceipt(receipt);
 			item.setVariant(variant);
@@ -139,6 +143,10 @@ public class StockReceiptService implements IStockReceiptService {
 			ProductVariant variant = variantRepository.findById(itemReq.getVariantId())
 					.orElseThrow(() -> new ResourceNotFoundException("không tìm thấy variant sản phẩm"));
 
+			if (!variant.getIsActive()) {
+				throw new BadRequestException("Biến thể '" + variant.getSku() + "' đã bị vô hiệu hóa, không thể nhập kho.");
+			}
+
 			StockReceiptItem item = new StockReceiptItem();
 			item.setReceipt(receipt);
 			item.setVariant(variant);
@@ -188,6 +196,10 @@ public class StockReceiptService implements IStockReceiptService {
 			// Tìm biến thể thay vì tìm WarehouseStock
 			ProductVariant variant = variantRepository.findById(item.getVariant().getId()).orElseThrow(
 					() -> new BadRequestException("Không tìm thấy biến thể SP ID: " + item.getVariant().getId()));
+
+			if (!variant.getIsActive()) {
+				throw new BadRequestException("Biến thể '" + variant.getSku() + "' đã bị vô hiệu hóa, không thể nhập kho.");
+			}
 
 			// Xử lý an toàn nếu quantity đang null
 			int oldQuantity = variant.getQuantity() != null ? variant.getQuantity() : 0;
