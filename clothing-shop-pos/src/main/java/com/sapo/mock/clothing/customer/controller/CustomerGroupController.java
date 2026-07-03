@@ -271,4 +271,22 @@ public class CustomerGroupController {
         return ResponseEntity.ok(new RestResponse<>(HttpStatus.OK.value(), null, msg, response));
     }
 
+    @GetMapping("/vouchers/history")
+    public ResponseEntity<RestResponse<Page<com.sapo.mock.clothing.customer.dto.response.CustomerVoucherHistoryResponse>>> getVoucherHistory(
+            @RequestParam(required = false, defaultValue = "") String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by("receivedAt").descending());
+        Page<com.sapo.mock.clothing.customer.dto.response.CustomerVoucherHistoryResponse> result = groupService.getVoucherHistory(keyword, pageable);
+
+        RestResponse<Page<com.sapo.mock.clothing.customer.dto.response.CustomerVoucherHistoryResponse>> response = new RestResponse<>();
+        response.setStatusCode(HttpStatus.OK.value());
+        response.setError(null);
+        response.setMessage("Tra cứu lịch sử phát voucher thành công");
+        response.setData(result);
+
+        return ResponseEntity.ok(response);
+    }
+
 }

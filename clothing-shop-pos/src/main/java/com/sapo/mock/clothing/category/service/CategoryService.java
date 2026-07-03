@@ -11,6 +11,9 @@ import com.sapo.mock.clothing.entity.Category;
 import com.sapo.mock.clothing.exception.BadRequestException;
 import com.sapo.mock.clothing.exception.ResourceNotFoundException;
 import com.sapo.mock.clothing.product.repository.ProductRepository;
+import com.sapo.mock.clothing.notification.service.NotificationService;
+import com.sapo.mock.clothing.entity.Notification;
+import com.sapo.mock.clothing.util.constant.NotificationConstants;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +24,7 @@ public class CategoryService implements ICategoryService {
 	final CategoryRepository categoryRepository;
 
 	private final ProductRepository productRepository;
+	private final NotificationService notificationService;
 
 	public CategoryResponse toCategoryResponse(Category category) {
 		CategoryResponse categoryDto = new CategoryResponse();
@@ -52,6 +56,14 @@ public class CategoryService implements ICategoryService {
 		Category category = new Category();
 		category.setName(request.getName());
 		categoryRepository.save(category);
+		
+		Notification notification = new Notification();
+		notification.setTitle("Danh mục mới");
+		notification.setMessage("Danh mục '" + category.getName() + "' vừa được thêm mới.");
+		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
+		notificationService.sendNotification(notification);
+		
 		return toCategoryResponse(category);
 	}
 
@@ -63,6 +75,13 @@ public class CategoryService implements ICategoryService {
 
 		category.setName(request.getName());
 		Category updatedCategory = categoryRepository.save(category);
+
+		Notification notification = new Notification();
+		notification.setTitle("Cập nhật danh mục");
+		notification.setMessage("Danh mục '" + updatedCategory.getName() + "' vừa được cập nhật.");
+		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
+		notificationService.sendNotification(notification);
 
 		return toCategoryResponse(updatedCategory);
 	}
@@ -82,12 +101,24 @@ public class CategoryService implements ICategoryService {
 			throw new RuntimeException("Danh mục này đã bị xóa trước đó");
 		}
 
+		// Kiểm tra không cho phép xóa Danh mục chung
+		if ("Danh mục chung".equalsIgnoreCase(category.getName())) {
+			throw new BadRequestException("Không thể xóa Danh mục chung hệ thống.");
+		}
+
 		// Thực hiện xóa mềm
 		category.setDeleted(true);
 		Category savedCategory = categoryRepository.save(category);
 
 		// Chuyển sản phẩm sang danh mục chung
 		moveProductsToDefaultCategory(id);
+
+		Notification notification = new Notification();
+		notification.setTitle("Xóa danh mục");
+		notification.setMessage("Danh mục '" + category.getName() + "' đã bị xóa (đưa vào thùng rác).");
+		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
+		notificationService.sendNotification(notification);
 
 		return toCategoryResponse(savedCategory);
 	}
@@ -106,6 +137,10 @@ public class CategoryService implements ICategoryService {
 			throw new BadRequestException("Danh mục vẫn chưa được xóa mềm, không thể xóa cứng. Hãy xóa mềm trước!");
 		}
 
+		if ("Danh mục chung".equalsIgnoreCase(category.getName())) {
+			throw new BadRequestException("Không thể xóa vĩnh viễn Danh mục chung hệ thống.");
+		}
+
 		// Kiểm tra xem có sản phẩm nào đang cắm vào danh mục này không
 		boolean hasProducts = productRepository.existsByCategory_Id(id);
 		if (hasProducts) {
@@ -120,6 +155,13 @@ public class CategoryService implements ICategoryService {
 		}
 
 		categoryRepository.deleteById(id);
+
+		Notification notification = new Notification();
+		notification.setTitle("Xóa vĩnh viễn danh mục");
+		notification.setMessage("Danh mục '" + category.getName() + "' đã bị xóa vĩnh viễn.");
+		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
+		notificationService.sendNotification(notification);
 	}
 
 	@Override
@@ -133,6 +175,10 @@ public class CategoryService implements ICategoryService {
 			throw new BadRequestException("Danh mục này đã bị xóa mềm, không thể thay đổi trạng thái hoạt động.");
 		}
 
+		if ("Danh mục chung".equalsIgnoreCase(category.getName()) && !active) {
+			throw new BadRequestException("Không thể ngừng hoạt động Danh mục chung hệ thống.");
+		}
+
 		category.setActive(active);
 		Category updatedCategory = categoryRepository.save(category);
 
@@ -140,6 +186,13 @@ public class CategoryService implements ICategoryService {
 		if (!active) {
 			moveProductsToDefaultCategory(id);
 		}
+
+		Notification notification = new Notification();
+		notification.setTitle("Trạng thái danh mục");
+		notification.setMessage("Danh mục '" + category.getName() + "' vừa " + (active ? "được bật hoạt động." : "bị ngừng hoạt động."));
+		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
+		notificationService.sendNotification(notification);
 
 		return toCategoryResponse(updatedCategory);
 	}

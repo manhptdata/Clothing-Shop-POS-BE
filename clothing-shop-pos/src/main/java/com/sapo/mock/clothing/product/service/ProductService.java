@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
@@ -32,6 +33,9 @@ import com.sapo.mock.clothing.product.DTO.ProductVariantResponse;
 import com.sapo.mock.clothing.product.repository.ProductRepository;
 import com.sapo.mock.clothing.product.repository.ProductVariantRepository;
 import com.sapo.mock.clothing.specification.ProductSpecification;
+import com.sapo.mock.clothing.notification.service.NotificationService;
+import com.sapo.mock.clothing.entity.Notification;
+import com.sapo.mock.clothing.util.constant.NotificationConstants;
 
 import lombok.RequiredArgsConstructor;
 
@@ -42,6 +46,7 @@ public class ProductService implements IProductService {
 	private final ProductAttributeService productAttributeService;
 	private final ProductVariantRepository productVariantRepository;
 	private final CategoryRepository categoryRepository;
+	private final NotificationService notificationService;
 
 	// =========================================================================
 	// 1. CÁC HÀM API CHÍNH (PUBLIC)
@@ -75,6 +80,14 @@ public class ProductService implements IProductService {
 		processVariants(product, request.getVariants(), valueLookup);
 
 		Product savedProduct = productRepository.save(product);
+		
+		Notification notification = new Notification();
+		notification.setTitle("Thêm mới sản phẩm");
+		notification.setMessage("Sản phẩm '" + savedProduct.getName() + "' vừa được thêm mới vào hệ thống.");
+		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
+		notificationService.sendNotification(notification);
+		
 		return toProductResponse(savedProduct);
 	}
 
@@ -94,6 +107,14 @@ public class ProductService implements IProductService {
 		processVariants(product, request.getVariants(), valueLookup);
 
 		Product updatedProduct = productRepository.save(product);
+		
+		Notification notification = new Notification();
+		notification.setTitle("Cập nhật sản phẩm");
+		notification.setMessage("Sản phẩm '" + updatedProduct.getName() + "' vừa được cập nhật thông tin.");
+		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
+		notificationService.sendNotification(notification);
+		
 		return toProductResponse(updatedProduct);
 	}
 
@@ -106,6 +127,14 @@ public class ProductService implements IProductService {
 		}
 		productDeleting.setIsDeleted(true);
 		productRepository.save(productDeleting);
+		
+		Notification notification = new Notification();
+		notification.setTitle("Xóa sản phẩm");
+		notification.setMessage("Sản phẩm '" + productDeleting.getName() + "' đã bị đưa vào thùng rác.");
+		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
+		notificationService.sendNotification(notification);
+		
 		return toProductResponse(productDeleting);
 	}
 
@@ -117,6 +146,13 @@ public class ProductService implements IProductService {
 			throw new BadRequestException("Sản phẩm vẫn đang hoạt động");
 		}
 		productRepository.deleteById(id);
+		
+		Notification notification = new Notification();
+		notification.setTitle("Xóa vĩnh viễn sản phẩm");
+		notification.setMessage("Sản phẩm '" + productDeleting.getName() + "' đã bị xóa vĩnh viễn khỏi hệ thống.");
+		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
+		notificationService.sendNotification(notification);
 	}
 
 	// =========================================================================
@@ -224,6 +260,19 @@ public class ProductService implements IProductService {
 			Map<String, ProductOptionValue> valueLookup) {
 		if (requests == null)
 			return;
+
+		Set<String> requestSkus = requests.stream()
+				.map(r -> r.getSku() != null ? r.getSku().trim().toUpperCase() : "")
+				.filter(s -> !s.isEmpty())
+				.collect(Collectors.toSet());
+
+		product.getVariants().forEach(v -> {
+			if (!requestSkus.contains(v.getSku().trim().toUpperCase())) {
+				v.setIsActive(false);
+			} else {
+				v.setIsActive(true);
+			}
+		});
 
 		for (ProductVariantRequest vReq : requests) {
 			String reqSku = vReq.getSku() != null ? vReq.getSku().trim() : "";
@@ -347,7 +396,8 @@ public class ProductService implements IProductService {
 		}
 
 		if (product.getVariants() != null && !product.getVariants().isEmpty()) {
-			List<ProductVariantResponse> variantDtos = product.getVariants().stream().map(v -> {
+			List<ProductVariantResponse> variantDtos = product.getVariants().stream()
+					.map(v -> {
 				ProductVariantResponse vRes = new ProductVariantResponse();
 				vRes.setId(v.getId());
 				vRes.setSku(v.getSku());
@@ -362,6 +412,7 @@ public class ProductService implements IProductService {
 				vRes.setLowStockThreshold(v.getLowStockThreshold());
 				vRes.setQuantity(v.getQuantity());
 				vRes.setImageUrl(v.getImageUrl());
+				vRes.setIsActive(v.getIsActive());
 				return vRes;
 			}).collect(Collectors.toList());
 			response.setVariants(variantDtos);

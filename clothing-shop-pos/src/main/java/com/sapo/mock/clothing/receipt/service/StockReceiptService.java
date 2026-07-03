@@ -21,6 +21,9 @@ import com.sapo.mock.clothing.entity.Supplier;
 import com.sapo.mock.clothing.exception.BadRequestException;
 import com.sapo.mock.clothing.exception.ResourceNotFoundException;
 import com.sapo.mock.clothing.product.repository.ProductVariantRepository; // Thêm import này
+import com.sapo.mock.clothing.notification.service.NotificationService;
+import com.sapo.mock.clothing.entity.Notification;
+import com.sapo.mock.clothing.util.constant.NotificationConstants;
 import com.sapo.mock.clothing.receipt.DTO.StockReceiptRequest;
 import com.sapo.mock.clothing.receipt.DTO.StockReceiptResponse;
 import com.sapo.mock.clothing.receipt.repository.StockLogRepository;
@@ -43,6 +46,7 @@ public class StockReceiptService implements IStockReceiptService {
 
 	// Thay thế WarehouseStockRepository bằng ProductVariantRepository
 	private final ProductVariantRepository variantRepository;
+	private final NotificationService notificationService;
 
 	@Override
 	@Transactional
@@ -74,6 +78,10 @@ public class StockReceiptService implements IStockReceiptService {
 			ProductVariant variant = variantRepository.findById(itemReq.getVariantId())
 					.orElseThrow(() -> new ResourceNotFoundException("không tìm thấy variant sản phẩm"));
 
+			if (!variant.getIsActive()) {
+				throw new BadRequestException("Biến thể '" + variant.getSku() + "' đã bị vô hiệu hóa, không thể nhập kho.");
+			}
+
 			StockReceiptItem item = new StockReceiptItem();
 			item.setReceipt(receipt);
 			item.setVariant(variant);
@@ -94,6 +102,13 @@ public class StockReceiptService implements IStockReceiptService {
 
 		// Lưu xuống DB
 		StockReceipt savedReceipt = receiptRepository.save(receipt);
+
+		Notification notification = new Notification();
+		notification.setTitle("Tạo phiếu nhập kho");
+		notification.setMessage("Phiếu nhập kho '" + savedReceipt.getCode() + "' vừa được tạo mới.");
+		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
+		notificationService.sendNotification(notification);
 
 		return mapToResponse(savedReceipt);
 	}
@@ -128,6 +143,10 @@ public class StockReceiptService implements IStockReceiptService {
 			ProductVariant variant = variantRepository.findById(itemReq.getVariantId())
 					.orElseThrow(() -> new ResourceNotFoundException("không tìm thấy variant sản phẩm"));
 
+			if (!variant.getIsActive()) {
+				throw new BadRequestException("Biến thể '" + variant.getSku() + "' đã bị vô hiệu hóa, không thể nhập kho.");
+			}
+
 			StockReceiptItem item = new StockReceiptItem();
 			item.setReceipt(receipt);
 			item.setVariant(variant);
@@ -145,6 +164,14 @@ public class StockReceiptService implements IStockReceiptService {
 		receipt.setTotalQuantity(totalQty);
 
 		StockReceipt savedReceipt = receiptRepository.save(receipt);
+
+		Notification notification = new Notification();
+		notification.setTitle("Cập nhật phiếu nhập kho");
+		notification.setMessage("Phiếu nhập kho '" + savedReceipt.getCode() + "' vừa được cập nhật.");
+		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
+		notificationService.sendNotification(notification);
+
 		return mapToResponse(savedReceipt);
 	}
 
@@ -169,6 +196,10 @@ public class StockReceiptService implements IStockReceiptService {
 			// Tìm biến thể thay vì tìm WarehouseStock
 			ProductVariant variant = variantRepository.findById(item.getVariant().getId()).orElseThrow(
 					() -> new BadRequestException("Không tìm thấy biến thể SP ID: " + item.getVariant().getId()));
+
+			if (!variant.getIsActive()) {
+				throw new BadRequestException("Biến thể '" + variant.getSku() + "' đã bị vô hiệu hóa, không thể nhập kho.");
+			}
 
 			// Xử lý an toàn nếu quantity đang null
 			int oldQuantity = variant.getQuantity() != null ? variant.getQuantity() : 0;
@@ -213,6 +244,14 @@ public class StockReceiptService implements IStockReceiptService {
 		}
 
 		receiptRepository.save(receipt);
+
+		Notification notification = new Notification();
+		notification.setTitle("Duyệt phiếu nhập kho");
+		notification.setMessage("Phiếu nhập kho '" + receipt.getCode() + "' vừa được duyệt thành công.");
+		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
+		notificationService.sendNotification(notification);
+
 		return mapToResponse(receipt);
 	}
 
@@ -274,6 +313,14 @@ public class StockReceiptService implements IStockReceiptService {
 
 		receipt.setStatus(ReceiptStatus.CANCELLED);
 		receiptRepository.save(receipt);
+
+		Notification notification = new Notification();
+		notification.setTitle("Hủy phiếu nhập kho");
+		notification.setMessage("Phiếu nhập kho '" + receipt.getCode() + "' đã bị hủy.");
+		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
+		notificationService.sendNotification(notification);
+
 		return mapToResponse(receipt);
 	}
 

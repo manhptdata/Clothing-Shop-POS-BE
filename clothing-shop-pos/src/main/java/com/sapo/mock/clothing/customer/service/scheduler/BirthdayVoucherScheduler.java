@@ -89,10 +89,11 @@ public class BirthdayVoucherScheduler {
      * Hàm phụ trợ kiểm tra trùng lặp theo mốc thời gian động và lưu vào DB
      */
     private void issueVoucherIfNotExist(Customer customer, Voucher voucher, Instant checkTimeLimit, Instant expiredAt) {
-        boolean alreadyIssued = customerVoucherRepository.existsByCustomerIdAndVoucherIdAndReceivedAtAfter(
+        // Chỉ kiểm tra xem trong tháng này khách đã nhận voucher chưa (để sang năm khách vẫn nhận được tiếp)
+        boolean alreadyIssuedThisMonth = customerVoucherRepository.existsByCustomerIdAndVoucherIdAndReceivedAtAfter(
                 customer.getId(), voucher.getId(), checkTimeLimit);
 
-        if (!alreadyIssued) {
+        if (!alreadyIssuedThisMonth) {
             CustomerVoucher cv = new CustomerVoucher();
             cv.setCustomer(customer);
             cv.setVoucher(voucher);
@@ -105,7 +106,9 @@ public class BirthdayVoucherScheduler {
                     voucher.getName(), customer.getFullName());
 
             String testEmail = (customer.getEmail() != null) ? customer.getEmail() : "manhwakunchi@gmail.com";
-            emailNotificationService.sendBirthdayVoucherEmail(testEmail, customer.getFullName(), voucher.getCode());
+            java.util.concurrent.CompletableFuture.runAsync(() -> {
+                emailNotificationService.sendBirthdayVoucherEmail(testEmail, customer.getFullName(), voucher.getCode());
+            });
         }
     }
 
