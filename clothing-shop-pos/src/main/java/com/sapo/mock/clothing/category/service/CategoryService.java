@@ -13,6 +13,7 @@ import com.sapo.mock.clothing.exception.ResourceNotFoundException;
 import com.sapo.mock.clothing.product.repository.ProductRepository;
 import com.sapo.mock.clothing.notification.service.NotificationService;
 import com.sapo.mock.clothing.entity.Notification;
+import com.sapo.mock.clothing.util.constant.NotificationConstants;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -60,6 +61,7 @@ public class CategoryService implements ICategoryService {
 		notification.setTitle("Danh mục mới");
 		notification.setMessage("Danh mục '" + category.getName() + "' vừa được thêm mới.");
 		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
 		notificationService.sendNotification(notification);
 		
 		return toCategoryResponse(category);
@@ -78,6 +80,7 @@ public class CategoryService implements ICategoryService {
 		notification.setTitle("Cập nhật danh mục");
 		notification.setMessage("Danh mục '" + updatedCategory.getName() + "' vừa được cập nhật.");
 		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
 		notificationService.sendNotification(notification);
 
 		return toCategoryResponse(updatedCategory);
@@ -114,6 +117,7 @@ public class CategoryService implements ICategoryService {
 		notification.setTitle("Xóa danh mục");
 		notification.setMessage("Danh mục '" + category.getName() + "' đã bị xóa (đưa vào thùng rác).");
 		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
 		notificationService.sendNotification(notification);
 
 		return toCategoryResponse(savedCategory);
@@ -156,6 +160,7 @@ public class CategoryService implements ICategoryService {
 		notification.setTitle("Xóa vĩnh viễn danh mục");
 		notification.setMessage("Danh mục '" + category.getName() + "' đã bị xóa vĩnh viễn.");
 		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
 		notificationService.sendNotification(notification);
 	}
 
@@ -186,6 +191,7 @@ public class CategoryService implements ICategoryService {
 		notification.setTitle("Trạng thái danh mục");
 		notification.setMessage("Danh mục '" + category.getName() + "' vừa " + (active ? "được bật hoạt động." : "bị ngừng hoạt động."));
 		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
 		notificationService.sendNotification(notification);
 
 		return toCategoryResponse(updatedCategory);

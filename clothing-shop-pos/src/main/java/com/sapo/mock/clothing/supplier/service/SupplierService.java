@@ -16,6 +16,7 @@ import com.sapo.mock.clothing.supplier.DTO.SupplierResponse;
 import com.sapo.mock.clothing.supplier.repository.SupplierRepository;
 import com.sapo.mock.clothing.notification.service.NotificationService;
 import com.sapo.mock.clothing.entity.Notification;
+import com.sapo.mock.clothing.util.constant.NotificationConstants;
 
 import lombok.RequiredArgsConstructor;
 
@@ -82,6 +83,7 @@ public class SupplierService implements ISupplierService {
 		notification.setTitle("Nhà cung cấp mới");
 		notification.setMessage("Nhà cung cấp '" + savedSupplier.getName() + "' vừa được thêm mới.");
 		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
 		notificationService.sendNotification(notification);
 
 		return toResponse(savedSupplier);
@@ -112,6 +114,7 @@ public class SupplierService implements ISupplierService {
 		notification.setTitle("Cập nhật nhà cung cấp");
 		notification.setMessage("Nhà cung cấp '" + updatedSupplier.getName() + "' vừa được cập nhật.");
 		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
 		notificationService.sendNotification(notification);
 
 		return toResponse(updatedSupplier);
@@ -135,6 +138,7 @@ public class SupplierService implements ISupplierService {
 		notification.setTitle("Ngừng hoạt động NCC");
 		notification.setMessage("Nhà cung cấp '" + supplier.getName() + "' vừa bị ngừng hoạt động.");
 		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
 		notificationService.sendNotification(notification);
 
 		return toResponse(supplier);
@@ -157,6 +161,7 @@ public class SupplierService implements ISupplierService {
 		notification.setTitle("Mở lại hoạt động NCC");
 		notification.setMessage("Nhà cung cấp '" + supplier.getName() + "' vừa được kích hoạt lại.");
 		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
 		notificationService.sendNotification(notification);
 
 		return toResponse(supplier);
@@ -177,6 +182,7 @@ public class SupplierService implements ISupplierService {
 			notification.setTitle("Xóa nhà cung cấp");
 			notification.setMessage("Nhà cung cấp '" + supplier.getName() + "' đã bị xóa vĩnh viễn.");
 			notification.setType("SYSTEM");
+			notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
 			notificationService.sendNotification(notification);
 
 		} catch (DataIntegrityViolationException e) {
