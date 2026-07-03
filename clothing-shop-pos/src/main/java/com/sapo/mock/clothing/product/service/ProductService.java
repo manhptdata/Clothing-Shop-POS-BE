@@ -32,6 +32,8 @@ import com.sapo.mock.clothing.product.DTO.ProductVariantResponse;
 import com.sapo.mock.clothing.product.repository.ProductRepository;
 import com.sapo.mock.clothing.product.repository.ProductVariantRepository;
 import com.sapo.mock.clothing.specification.ProductSpecification;
+import com.sapo.mock.clothing.notification.service.NotificationService;
+import com.sapo.mock.clothing.entity.Notification;
 
 import lombok.RequiredArgsConstructor;
 
@@ -42,6 +44,7 @@ public class ProductService implements IProductService {
 	private final ProductAttributeService productAttributeService;
 	private final ProductVariantRepository productVariantRepository;
 	private final CategoryRepository categoryRepository;
+	private final NotificationService notificationService;
 
 	// =========================================================================
 	// 1. CÁC HÀM API CHÍNH (PUBLIC)
@@ -75,6 +78,13 @@ public class ProductService implements IProductService {
 		processVariants(product, request.getVariants(), valueLookup);
 
 		Product savedProduct = productRepository.save(product);
+		
+		Notification notification = new Notification();
+		notification.setTitle("Sản phẩm mới");
+		notification.setMessage("Sản phẩm '" + savedProduct.getName() + "' vừa được thêm mới.");
+		notification.setType("SYSTEM");
+		notificationService.sendNotification(notification);
+		
 		return toProductResponse(savedProduct);
 	}
 
@@ -94,6 +104,13 @@ public class ProductService implements IProductService {
 		processVariants(product, request.getVariants(), valueLookup);
 
 		Product updatedProduct = productRepository.save(product);
+		
+		Notification notification = new Notification();
+		notification.setTitle("Cập nhật sản phẩm");
+		notification.setMessage("Sản phẩm '" + updatedProduct.getName() + "' vừa được cập nhật.");
+		notification.setType("SYSTEM");
+		notificationService.sendNotification(notification);
+		
 		return toProductResponse(updatedProduct);
 	}
 
@@ -106,6 +123,13 @@ public class ProductService implements IProductService {
 		}
 		productDeleting.setIsDeleted(true);
 		productRepository.save(productDeleting);
+		
+		Notification notification = new Notification();
+		notification.setTitle("Xóa sản phẩm");
+		notification.setMessage("Sản phẩm '" + productDeleting.getName() + "' đã bị xóa (đưa vào thùng rác).");
+		notification.setType("SYSTEM");
+		notificationService.sendNotification(notification);
+		
 		return toProductResponse(productDeleting);
 	}
 
@@ -117,6 +141,12 @@ public class ProductService implements IProductService {
 			throw new BadRequestException("Sản phẩm vẫn đang hoạt động");
 		}
 		productRepository.deleteById(id);
+		
+		Notification notification = new Notification();
+		notification.setTitle("Xóa vĩnh viễn sản phẩm");
+		notification.setMessage("Sản phẩm '" + productDeleting.getName() + "' đã bị xóa vĩnh viễn.");
+		notification.setType("SYSTEM");
+		notificationService.sendNotification(notification);
 	}
 
 	// =========================================================================

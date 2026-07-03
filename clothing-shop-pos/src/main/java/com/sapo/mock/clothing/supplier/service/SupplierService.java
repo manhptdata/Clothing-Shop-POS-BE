@@ -14,6 +14,8 @@ import com.sapo.mock.clothing.specification.SupplierSpecification;
 import com.sapo.mock.clothing.supplier.DTO.SupplierRequest;
 import com.sapo.mock.clothing.supplier.DTO.SupplierResponse;
 import com.sapo.mock.clothing.supplier.repository.SupplierRepository;
+import com.sapo.mock.clothing.notification.service.NotificationService;
+import com.sapo.mock.clothing.entity.Notification;
 
 import lombok.RequiredArgsConstructor;
 
@@ -22,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 public class SupplierService implements ISupplierService {
 
 	private final SupplierRepository supplierRepository;
+	private final NotificationService notificationService;
 
 	// Helper method map Entity -> Response
 	private SupplierResponse toResponse(Supplier supplier) {
@@ -74,6 +77,13 @@ public class SupplierService implements ISupplierService {
 		supplier.setActive(true); // Mặc định hoạt động khi tạo mới
 
 		Supplier savedSupplier = supplierRepository.save(supplier);
+
+		Notification notification = new Notification();
+		notification.setTitle("Nhà cung cấp mới");
+		notification.setMessage("Nhà cung cấp '" + savedSupplier.getName() + "' vừa được thêm mới.");
+		notification.setType("SYSTEM");
+		notificationService.sendNotification(notification);
+
 		return toResponse(savedSupplier);
 	}
 
@@ -97,6 +107,13 @@ public class SupplierService implements ISupplierService {
 		supplier.setNote(request.getNote());
 
 		Supplier updatedSupplier = supplierRepository.save(supplier);
+
+		Notification notification = new Notification();
+		notification.setTitle("Cập nhật nhà cung cấp");
+		notification.setMessage("Nhà cung cấp '" + updatedSupplier.getName() + "' vừa được cập nhật.");
+		notification.setType("SYSTEM");
+		notificationService.sendNotification(notification);
+
 		return toResponse(updatedSupplier);
 	}
 
@@ -113,6 +130,13 @@ public class SupplierService implements ISupplierService {
 		// Xóa mềm: Chuyển cờ active thành false
 		supplier.setActive(false);
 		supplierRepository.save(supplier);
+
+		Notification notification = new Notification();
+		notification.setTitle("Ngừng hoạt động NCC");
+		notification.setMessage("Nhà cung cấp '" + supplier.getName() + "' vừa bị ngừng hoạt động.");
+		notification.setType("SYSTEM");
+		notificationService.sendNotification(notification);
+
 		return toResponse(supplier);
 	}
 
@@ -128,6 +152,13 @@ public class SupplierService implements ISupplierService {
 
 		supplier.setActive(true);
 		supplierRepository.save(supplier);
+
+		Notification notification = new Notification();
+		notification.setTitle("Mở lại hoạt động NCC");
+		notification.setMessage("Nhà cung cấp '" + supplier.getName() + "' vừa được kích hoạt lại.");
+		notification.setType("SYSTEM");
+		notificationService.sendNotification(notification);
+
 		return toResponse(supplier);
 	}
 
@@ -141,6 +172,13 @@ public class SupplierService implements ISupplierService {
 		}
 		try {
 			supplierRepository.delete(supplier);
+
+			Notification notification = new Notification();
+			notification.setTitle("Xóa nhà cung cấp");
+			notification.setMessage("Nhà cung cấp '" + supplier.getName() + "' đã bị xóa vĩnh viễn.");
+			notification.setType("SYSTEM");
+			notificationService.sendNotification(notification);
+
 		} catch (DataIntegrityViolationException e) {
 			// Bắt lỗi khi Nhà cung cấp đã dính khóa ngoại (Đã có giao dịch nhập hàng)
 			throw new BadRequestException(
