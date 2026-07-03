@@ -101,7 +101,14 @@ public class NotificationService {
                 if ("LOW_STOCK".equals(saved.getType())) {
                     shouldSend = "ROLE_ADMIN".equals(subscriber.role) || "ROLE_WH".equals(subscriber.role);
                 } else {
-                    shouldSend = saved.getTargetRole().equals(subscriber.role);
+                    // Hỗ trợ targetRole dạng "ROLE_ADMIN,ROLE_WH"
+                    String[] roles = saved.getTargetRole().split(",");
+                    for (String r : roles) {
+                        if (r.trim().equals(subscriber.role)) {
+                            shouldSend = true;
+                            break;
+                        }
+                    }
                 }
             } else {
                 // Broadcast

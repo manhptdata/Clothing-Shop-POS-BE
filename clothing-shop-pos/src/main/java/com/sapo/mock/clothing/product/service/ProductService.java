@@ -34,6 +34,7 @@ import com.sapo.mock.clothing.product.repository.ProductVariantRepository;
 import com.sapo.mock.clothing.specification.ProductSpecification;
 import com.sapo.mock.clothing.notification.service.NotificationService;
 import com.sapo.mock.clothing.entity.Notification;
+import com.sapo.mock.clothing.util.constant.NotificationConstants;
 
 import lombok.RequiredArgsConstructor;
 
@@ -80,9 +81,10 @@ public class ProductService implements IProductService {
 		Product savedProduct = productRepository.save(product);
 		
 		Notification notification = new Notification();
-		notification.setTitle("Sản phẩm mới");
-		notification.setMessage("Sản phẩm '" + savedProduct.getName() + "' vừa được thêm mới.");
+		notification.setTitle("Thêm mới sản phẩm");
+		notification.setMessage("Sản phẩm '" + savedProduct.getName() + "' vừa được thêm mới vào hệ thống.");
 		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
 		notificationService.sendNotification(notification);
 		
 		return toProductResponse(savedProduct);
@@ -107,8 +109,9 @@ public class ProductService implements IProductService {
 		
 		Notification notification = new Notification();
 		notification.setTitle("Cập nhật sản phẩm");
-		notification.setMessage("Sản phẩm '" + updatedProduct.getName() + "' vừa được cập nhật.");
+		notification.setMessage("Sản phẩm '" + updatedProduct.getName() + "' vừa được cập nhật thông tin.");
 		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
 		notificationService.sendNotification(notification);
 		
 		return toProductResponse(updatedProduct);
@@ -126,8 +129,9 @@ public class ProductService implements IProductService {
 		
 		Notification notification = new Notification();
 		notification.setTitle("Xóa sản phẩm");
-		notification.setMessage("Sản phẩm '" + productDeleting.getName() + "' đã bị xóa (đưa vào thùng rác).");
+		notification.setMessage("Sản phẩm '" + productDeleting.getName() + "' đã bị đưa vào thùng rác.");
 		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
 		notificationService.sendNotification(notification);
 		
 		return toProductResponse(productDeleting);
@@ -144,8 +148,9 @@ public class ProductService implements IProductService {
 		
 		Notification notification = new Notification();
 		notification.setTitle("Xóa vĩnh viễn sản phẩm");
-		notification.setMessage("Sản phẩm '" + productDeleting.getName() + "' đã bị xóa vĩnh viễn.");
+		notification.setMessage("Sản phẩm '" + productDeleting.getName() + "' đã bị xóa vĩnh viễn khỏi hệ thống.");
 		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
 		notificationService.sendNotification(notification);
 	}
 

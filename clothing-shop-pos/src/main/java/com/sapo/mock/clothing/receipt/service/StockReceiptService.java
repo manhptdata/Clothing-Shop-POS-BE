@@ -23,6 +23,7 @@ import com.sapo.mock.clothing.exception.ResourceNotFoundException;
 import com.sapo.mock.clothing.product.repository.ProductVariantRepository; // Thêm import này
 import com.sapo.mock.clothing.notification.service.NotificationService;
 import com.sapo.mock.clothing.entity.Notification;
+import com.sapo.mock.clothing.util.constant.NotificationConstants;
 import com.sapo.mock.clothing.receipt.DTO.StockReceiptRequest;
 import com.sapo.mock.clothing.receipt.DTO.StockReceiptResponse;
 import com.sapo.mock.clothing.receipt.repository.StockLogRepository;
@@ -102,6 +103,7 @@ public class StockReceiptService implements IStockReceiptService {
 		notification.setTitle("Tạo phiếu nhập kho");
 		notification.setMessage("Phiếu nhập kho '" + savedReceipt.getCode() + "' vừa được tạo mới.");
 		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
 		notificationService.sendNotification(notification);
 
 		return mapToResponse(savedReceipt);
@@ -159,6 +161,7 @@ public class StockReceiptService implements IStockReceiptService {
 		notification.setTitle("Cập nhật phiếu nhập kho");
 		notification.setMessage("Phiếu nhập kho '" + savedReceipt.getCode() + "' vừa được cập nhật.");
 		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
 		notificationService.sendNotification(notification);
 
 		return mapToResponse(savedReceipt);
@@ -234,6 +237,7 @@ public class StockReceiptService implements IStockReceiptService {
 		notification.setTitle("Duyệt phiếu nhập kho");
 		notification.setMessage("Phiếu nhập kho '" + receipt.getCode() + "' vừa được duyệt thành công.");
 		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
 		notificationService.sendNotification(notification);
 
 		return mapToResponse(receipt);
@@ -302,6 +306,7 @@ public class StockReceiptService implements IStockReceiptService {
 		notification.setTitle("Hủy phiếu nhập kho");
 		notification.setMessage("Phiếu nhập kho '" + receipt.getCode() + "' đã bị hủy.");
 		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
 		notificationService.sendNotification(notification);
 
 		return mapToResponse(receipt);
