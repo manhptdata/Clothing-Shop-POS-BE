@@ -14,6 +14,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Inte
     @Query("SELECT n FROM Notification n WHERE " +
            "(n.targetUserId = :userId) OR " +
            "(n.targetRole = :role) OR " +
+           "(FUNCTION('FIND_IN_SET', :role, n.targetRole) > 0) OR " +
            "(n.type = 'LOW_STOCK' AND (:role = 'ROLE_ADMIN' OR :role = 'ROLE_WH')) OR " +
            "(n.targetUserId IS NULL AND n.targetRole IS NULL) " +
            "ORDER BY n.createdAt DESC")
