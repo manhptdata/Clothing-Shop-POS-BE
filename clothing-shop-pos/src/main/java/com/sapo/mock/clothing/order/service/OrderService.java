@@ -269,49 +269,7 @@ public class OrderService {
         return totalAmount;
     }
 
-    private com.sapo.mock.clothing.entity.CustomerVoucher applyVoucher(ReqCreateOrderDTO dto, Order order, Customer customer, BigDecimal currentTotal) {
-        if (dto.getVoucherCode() == null || dto.getVoucherCode().trim().isEmpty()) {
-            order.setVoucherCode(null);
-            order.setDiscountFromVoucher(BigDecimal.ZERO);
-            return null;
-        }
-
-        com.sapo.mock.clothing.entity.CustomerVoucher appliedVoucher = customerVoucherRepository
-                .findUnusedVoucherByCustomerAndCode(customer.getId(), dto.getVoucherCode().trim())
-                .orElseThrow(() -> new BadRequestException("Mã voucher không hợp lệ, không tồn tại hoặc đã được sử dụng"));
-        
-        Voucher voucher = appliedVoucher.getVoucher();
-        // Cho phép khách hàng dùng voucher đã phát ngay cả khi chiến dịch (Voucher Campaign) bị khóa.
-        // Khóa chiến dịch chỉ có ý nghĩa ngừng phát mới.
-        if (appliedVoucher.getExpiredAt().isBefore(Instant.now())) {
-            throw new BadRequestException("Voucher này đã hết hạn");
-        }
-        if (voucher.getMinOrderValue() != null && currentTotal.compareTo(voucher.getMinOrderValue()) < 0) {
-            throw new BadRequestException("Đơn hàng chưa đạt giá trị tối thiểu (" + voucher.getMinOrderValue() + ") để dùng voucher này");
-        }
-
-        BigDecimal discount = voucher.getDiscountAmount().min(currentTotal);
-        order.setVoucherCode(voucher.getCode());
-        order.setDiscountFromVoucher(discount);
-        return appliedVoucher;
-    }
-
-    private void applyPoints(ReqCreateOrderDTO dto, Order order, Customer customer, BigDecimal currentTotal) {
-        if (dto.getPointsToUse() == null || dto.getPointsToUse() <= 0) {
-            order.setPointsUsed(0);
-            order.setDiscountFromPoints(BigDecimal.ZERO);
-            return;
-        }
-
-        if (customer.getRewardPoints() < dto.getPointsToUse()) {
-            throw new BadRequestException("Khách hàng không đủ điểm. Điểm hiện tại: " + customer.getRewardPoints());
-        }
-        
-        BigDecimal discount = BigDecimal.valueOf(dto.getPointsToUse()).multiply(PointConstant.REDEEM_RATE).min(currentTotal);
-        order.setPointsUsed(dto.getPointsToUse());
-        order.setDiscountFromPoints(discount);
-    }
-
+    // Kết thúc đơn hàng
     private void finalizeOrderAmounts(ReqCreateOrderDTO dto, Order order, BigDecimal totalAmount) {
         order.setTotalAmount(totalAmount);
         if (order.getStatus() == OrderStatus.COMPLETED) {

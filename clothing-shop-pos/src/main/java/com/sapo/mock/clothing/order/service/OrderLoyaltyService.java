@@ -39,9 +39,8 @@ public class OrderLoyaltyService {
                 .orElseThrow(() -> new BadRequestException("Mã voucher không hợp lệ, không tồn tại hoặc đã được sử dụng"));
 
         Voucher voucher = appliedVoucher.getVoucher();
-        if (voucher.getStatus() != VoucherCampaignStatusEnum.ACTIVE) {
-            throw new BadRequestException("Voucher này đã bị khóa");
-        }
+        // Cho phép khách hàng dùng voucher đã phát ngay cả khi chiến dịch (Voucher Campaign) bị khóa.
+        // Khóa chiến dịch chỉ có ý nghĩa ngừng phát mới.
         if (appliedVoucher.getExpiredAt().isBefore(Instant.now())) {
             throw new BadRequestException("Voucher này đã hết hạn");
         }
