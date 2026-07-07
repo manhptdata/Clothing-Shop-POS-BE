@@ -8,6 +8,10 @@ import com.sapo.mock.clothing.customer.repository.CustomerRepository;
 import com.sapo.mock.clothing.customer.service.AiAnalysisService;
 import com.sapo.mock.clothing.entity.CareCampaign;
 import com.sapo.mock.clothing.entity.Customer;
+import com.sapo.mock.clothing.entity.Order;
+import com.sapo.mock.clothing.entity.OrderLineItem;
+import com.sapo.mock.clothing.order.repository.OrderRepository;
+import com.sapo.mock.clothing.order.repository.OrderLineItemRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -36,6 +40,12 @@ public class AiAnalysisServiceImpl implements AiAnalysisService {
 
     @Autowired
     private CareCampaignRepository careCampaignRepository;
+
+    @Autowired
+    private OrderRepository orderRepository;
+
+    @Autowired
+    private OrderLineItemRepository orderLineItemRepository;
 
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(java.time.Duration.ofSeconds(30))
@@ -67,19 +77,40 @@ public class AiAnalysisServiceImpl implements AiAnalysisService {
 
             String genderStr = customer.getGender() != null ? customer.getGender().name() : "Không rõ";
 
-            String birthdayRule = (campaign.getType() != null && campaign.getType().contains("BIRTHDAY")) || (campaign.getName() != null && campaign.getName().toLowerCase().contains("sinh nhật"))
-                    ? "LƯU Ý RIÊNG: Đây là chiến dịch chúc mừng Sinh nhật, TUYỆT ĐỐI KHÔNG giải thích chi tiết về điểm thưởng hay chi tiết voucher. Chỉ cần báo cửa hàng có một phần quà/voucher sinh nhật đặc biệt tặng khách.\n"
-                    : "";
+            String campaignNameLower = campaign.getName() != null ? campaign.getName().toLowerCase() : "";
+            String campaignType = campaign.getType() != null ? campaign.getType() : "";
+            
+            String campaignRule = "";
+            if (campaignType.contains("BIRTHDAY") || campaignNameLower.contains("sinh nhật")) {
+                campaignRule = "LƯU Ý RIÊNG CHO CHIẾN DỊCH SINH NHẬT: Mục đích chính là lôi kéo khách đến shop. Hãy thông báo rằng cửa hàng có một phần quà/voucher chúc mừng sinh nhật đã được gửi về email của khách, nhắc khách kiểm tra email và ghé shop để sử dụng. TUYỆT ĐỐI KHÔNG giải thích chi tiết dài dòng về điểm thưởng.\n";
+            } else if (campaignNameLower.contains("7 ngày")) {
+                campaignRule = "LƯU Ý RIÊNG CHO CHIẾN DỊCH SAU 7 NGÀY MUA: Mục đích chính là hỏi thăm trải nghiệm mua hàng và sử dụng sản phẩm của khách, hỏi xem khách có cần hỗ trợ hay shop cần cải tiến gì không. Ở phần Xử lý từ chối (objection_handling) nếu khách bận không nghe máy, bắt buộc phải có gợi ý Hẹn gọi lại vào một giờ cụ thể trong ngày (ví dụ: dạ em xin phép gọi lại vào 15h chiều nay).\n";
+            } else if (campaignNameLower.contains("30 ngày")) {
+                campaignRule = "LƯU Ý RIÊNG CHO CHIẾN DỊCH SAU 30 NGÀY MUA: Khách đã lâu chưa phát sinh đơn hàng. Mục đích chính là lôi kéo khách quay lại shop, giới thiệu các chính sách ưu đãi mới hoặc bộ sưu tập mới. Ở phần Xử lý từ chối (objection_handling) nếu khách bận không nghe máy, bắt buộc phải có gợi ý Hẹn gọi lại vào một giờ cụ thể trong ngày (ví dụ: dạ em xin phép gọi lại vào 15h chiều nay).\n";
+            }
+
+            List<Order> recentOrders = orderRepository.findTop3ByCustomerIdOrderByCreatedAtDesc(customerId);
+            String orderHistoryText = "";
+            if (!recentOrders.isEmpty()) {
+                orderHistoryText = "Lịch sử mua hàng gần đây (để tham khảo cá nhân hóa kịch bản, ví dụ có thể nhắc lại các món đồ khách đã mua để tạo sự gần gũi, khen ngợi phong cách nếu có thể):\n";
+                for (Order o : recentOrders) {
+                    List<OrderLineItem> items = orderLineItemRepository.findByOrderId(o.getId());
+                    String productNames = items.stream().map(OrderLineItem::getProductName).collect(java.util.stream.Collectors.joining(", "));
+                    orderHistoryText += "- Đơn ngày " + o.getCreatedAt().toString().substring(0, 10) + " (Mua: " + productNames + ")\n";
+                }
+            }
 
             String systemInstruction = "Bạn là một nhân viên chăm sóc khách hàng xuất sắc của cửa hàng quần áo Sapo Clothing.\n"
                     + "Nhiệm vụ của bạn là TỰ ĐỘNG sáng tạo ra kịch bản gọi điện, tin nhắn SMS và cẩm nang xử lý từ chối HAY NHẤT, CHUYÊN NGHIỆP NHẤT để liên hệ với khách trong chiến dịch: '" + campaign.getName() + "'.\n"
-                    + birthdayRule
+                    + campaignRule
                     + "Thông tin khách hàng: Tên: " + customer.getFullName() + " (" + genderStr + ", " + (age > 0 ? age + " tuổi" : "Chưa rõ") + "). Tổng chi tiêu: " + (customer.getTotalSpent() != null ? customer.getTotalSpent() : "0") + " VNĐ. Điểm: " + customer.getRewardPoints() + ".\n"
-                    + "YÊU CẦU QUAN TRỌNG:\n"
-                    + "1. Kịch bản gọi điện (call_script) phải chia thành các phần rõ ràng như: Lời mở đầu, Giới thiệu & Thăm dò nhu cầu, Kết thúc cuộc gọi.\n"
-                    + "2. Kịch bản xử lý từ chối (objection_handling) cần gợi ý vài trường hợp thực tế (Ví dụ: Khách bận, Khách chưa có nhu cầu, Khách chê giá cao) kèm cách đáp lời lịch sự.\n"
-                    + "3. TUYỆT ĐỐI KHÔNG được tự bịa ra các voucher, mã giảm giá hay chương trình khuyến mãi ảo (không tự bịa voucher 100k, 20%...). Chỉ được nhắc đến số Điểm hiện có của khách hàng nếu khách có điểm.\n"
-                    + "4. TUYỆT ĐỐI không dùng ký tự ngoặc kép (\") bên trong nội dung văn bản để tránh làm lỗi cấu trúc chuỗi JSON, thay vào đó hãy dùng dấu nháy đơn (').";
+                    + orderHistoryText
+                    + "YÊU CẦU QUAN TRỌNG VÀ ĐỊNH DẠNG (FORMAT):\n"
+                    + "1. Về Nội dung Kịch bản gọi (call_script): Phải chia thành các phần rõ ràng như Lời mở đầu, Giới thiệu & Thăm dò nhu cầu, Kết thúc cuộc gọi.\n"
+                    + "2. Về Nội dung Xử lý từ chối (objection_handling): Cần gợi ý vài trường hợp thực tế (Ví dụ: Khách bận, Khách chưa có nhu cầu, Khách chê giá cao) kèm cách đáp lời lịch sự.\n"
+                    + "3. Về Thông tin khuyến mãi: TUYỆT ĐỐI KHÔNG được tự bịa ra các voucher, mã giảm giá hay chương trình khuyến mãi ảo. Chỉ được nhắc đến số Điểm hiện có nếu có.\n"
+                    + "4. Về JSON: TUYỆT ĐỐI không dùng ký tự ngoặc kép (\") bên trong nội dung văn bản để tránh làm lỗi cấu trúc chuỗi JSON, thay vào đó hãy dùng dấu nháy đơn (').\n"
+                    + "5. Về Hiển thị (QUAN TRỌNG NHẤT): Phải trình bày kết quả CỰC KỲ RÕ RÀNG, DỄ NHÌN vì nhân viên sẽ đọc trực tiếp. Từng phần phải cách nhau bằng dòng trống (\\n\\n). SỬ DỤNG EMOJI để làm gạch đầu dòng hoặc tạo điểm nhấn. Dùng CHỮ IN HOA cho các tiêu đề chính. KHÔNG ĐƯỢC dùng ký tự Markdown như ** hay # vì hệ thống không hiển thị được Markdown.";
 
             // 1. Tạo phần contents
             Map<String, Object> textPart = Map.of("text", systemInstruction);

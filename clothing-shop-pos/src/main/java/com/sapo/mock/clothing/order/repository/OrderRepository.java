@@ -12,6 +12,8 @@ public interface OrderRepository extends JpaRepository<Order, Integer>, JpaSpeci
 
     long countByCreatedAtAfter(Instant startOfDay);
 
+    java.util.List<Order> findTop3ByCustomerIdOrderByCreatedAtDesc(Integer customerId);
+
     long countByCreatedAtBetween(Instant start, Instant end);
 
     java.util.Optional<Order> findByOrderNumber(String orderNumber);

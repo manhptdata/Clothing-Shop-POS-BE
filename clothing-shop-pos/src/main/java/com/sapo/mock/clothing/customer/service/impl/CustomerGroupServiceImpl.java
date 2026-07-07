@@ -89,6 +89,10 @@ public class CustomerGroupServiceImpl implements CustomerGroupService {
         }
 
         group = customerGroupRepository.save(group);
+        
+        // Đồng bộ lại hạng cho tất cả khách hàng sau khi tạo nhóm mới
+        syncAllCustomerRanks();
+        
         return getGroupById(group.getId());
     }
 
@@ -123,6 +127,10 @@ public class CustomerGroupServiceImpl implements CustomerGroupService {
         }
 
         customerGroupRepository.save(group);
+        
+        // Đồng bộ lại hạng cho tất cả khách hàng sau khi cập nhật nhóm
+        syncAllCustomerRanks();
+        
         return getGroupById(group.getId());
     }
 
@@ -136,8 +144,11 @@ public class CustomerGroupServiceImpl implements CustomerGroupService {
         group.setStatus(CustomerStatusEnum.INACTIVE);
         customerGroupRepository.save(group);
 
-        // Xóa tận gốc ID nhóm khỏi tất cả khách hàng đang thuộc nhóm này
-        customerRepository.removeGroupFromAllCustomers(id);
+        // Sau khi xóa nhóm, gọi hàm đồng bộ lại hạng cho tất cả khách hàng.
+        // Hàm này sẽ tự động xét tổng chi tiêu và áp vào nhóm mới phù hợp.
+        // Nếu không có nhóm nào phù hợp (ví dụ chi tiêu chưa đủ min của bất kỳ nhóm nào),
+        // customerGroup sẽ tự động được set thành null (Chưa xếp hạng).
+        syncAllCustomerRanks();
     }
 
     @Override
@@ -151,23 +162,11 @@ public class CustomerGroupServiceImpl implements CustomerGroupService {
         for (Customer customer : customers) {
             java.math.BigDecimal totalSpent = customer.getTotalSpent() != null ? customer.getTotalSpent() : java.math.BigDecimal.ZERO;
 
-            // Bước 1: Tìm nhóm khớp chính xác theo khoảng [minSpending, maxSpending)
+            // Chỉ gán vào nhóm nếu thỏa mãn chính xác cả minSpending và maxSpending
             CustomerGroup suitableGroup = null;
             for (CustomerGroup group : activeGroups) {
                 if (group.getMinSpending() != null && totalSpent.compareTo(group.getMinSpending()) >= 0) {
                     if (group.getMaxSpending() == null || totalSpent.compareTo(group.getMaxSpending()) < 0) {
-                        suitableGroup = group;
-                        break;
-                    }
-                }
-            }
-
-            // Bước 2: Nếu không tìm được nhóm chính xác (xảy ra khi nhóm cũ bị xóa tạo ra khoảng trống),
-            // fallback sang nhóm có minSpending cao nhất mà khách hàng vẫn đạt được (bỏ qua maxSpending).
-            // Ví dụ: Khách tiêu 25tr, nhóm Bạc bị xóa, chỉ còn Đồng (10-20tr) → gán Đồng thay vì để NULL.
-            if (suitableGroup == null) {
-                for (CustomerGroup group : activeGroups) {
-                    if (group.getMinSpending() != null && totalSpent.compareTo(group.getMinSpending()) >= 0) {
                         suitableGroup = group;
                         break;
                     }
