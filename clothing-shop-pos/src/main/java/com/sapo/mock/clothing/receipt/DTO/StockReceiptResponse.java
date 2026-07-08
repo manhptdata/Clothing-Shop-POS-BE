@@ -14,6 +14,7 @@ public class StockReceiptResponse {
 	// Đã xóa bỏ warehouseId
 
 	private Integer supplierId;
+	private String supplierName;
 	private String status; // DRAFT hoặc CONFIRMED
 	private String note;
 	private Integer totalQuantity;

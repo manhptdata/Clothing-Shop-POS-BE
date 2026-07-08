@@ -345,9 +345,10 @@ public class StockReceiptService implements IStockReceiptService {
 			response.setStatus(entity.getStatus().name());
 		}
 
-		// Map ID nhà cung cấp
+		// Map thông tin nhà cung cấp
 		if (entity.getSupplier() != null) {
 			response.setSupplierId(entity.getSupplier().getId());
+			response.setSupplierName(entity.getSupplier().getName());
 		}
 
 		response.setNote(entity.getNote());
