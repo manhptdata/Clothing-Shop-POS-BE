@@ -1,6 +1,5 @@
 package com.sapo.mock.clothing.supplier.service;
 
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -10,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.sapo.mock.clothing.entity.Supplier;
 import com.sapo.mock.clothing.exception.BadRequestException;
 import com.sapo.mock.clothing.exception.ResourceNotFoundException;
+import com.sapo.mock.clothing.receipt.repository.StockReceiptRepository;
 import com.sapo.mock.clothing.specification.SupplierSpecification;
 import com.sapo.mock.clothing.supplier.DTO.SupplierRequest;
 import com.sapo.mock.clothing.supplier.DTO.SupplierResponse;
@@ -25,6 +25,7 @@ import lombok.RequiredArgsConstructor;
 public class SupplierService implements ISupplierService {
 
 	private final SupplierRepository supplierRepository;
+	private final StockReceiptRepository stockReceiptRepository;
 	private final NotificationService notificationService;
 
 	// Helper method map Entity -> Response
@@ -173,22 +174,21 @@ public class SupplierService implements ISupplierService {
 		Supplier supplier = supplierRepository.findById(id)
 				.orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Nhà cung cấp"));
 		if (supplier.isActive()) {
-			throw new BadRequestException("Nhà cung cấp này vẫn đang hợp tác không thể xóa, hãy ngừng hợp tác trước");
+			throw new BadRequestException("Nhà cung cấp này vẫn đang hợp tác, không thể xóa. Hãy ngừng hợp tác trước.");
 		}
-		try {
-			supplierRepository.delete(supplier);
-
-			Notification notification = new Notification();
-			notification.setTitle("Xóa nhà cung cấp");
-			notification.setMessage("Nhà cung cấp '" + supplier.getName() + "' đã bị xóa vĩnh viễn.");
-			notification.setType("SYSTEM");
-			notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
-			notificationService.sendNotification(notification);
-
-		} catch (DataIntegrityViolationException e) {
-			// Bắt lỗi khi Nhà cung cấp đã dính khóa ngoại (Đã có giao dịch nhập hàng)
+		// Kiểm tra trước: nhà cung cấp có lịch sử phiếu nhập kho không?
+		if (stockReceiptRepository.existsBySupplierId(id)) {
 			throw new BadRequestException(
-					"Không thể xóa cứng! Nhà cung cấp này đã có lịch sử giao dịch. Vui lòng dùng chức năng Xóa mềm (Ngừng hoạt động).");
+					"Không thể xóa vĩnh viễn! Nhà cung cấp '" + supplier.getName() + "' đã có lịch sử phiếu nhập kho. Hãy dùng chức năng Ngừng hoạt động thay thế.");
 		}
+
+		supplierRepository.delete(supplier);
+
+		Notification notification = new Notification();
+		notification.setTitle("Xóa nhà cung cấp");
+		notification.setMessage("Nhà cung cấp '" + supplier.getName() + "' đã bị xóa vĩnh viễn.");
+		notification.setType("SYSTEM");
+		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
+		notificationService.sendNotification(notification);
 	}
 }

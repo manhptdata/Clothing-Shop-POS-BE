@@ -15,4 +15,6 @@ public interface StockReceiptRepository extends JpaRepository<StockReceipt, Inte
 
 	Page<StockReceipt> findByStatus(ReceiptStatus status, Pageable pageable);
 
+	boolean existsBySupplierId(Integer supplierId);
+
 }
