@@ -287,7 +287,7 @@ public class OrderService {
         }
     }
 
-    // Hoàn thành thanh toán đơn hàng
+    // Hoàn thành thanh toán đơn hàng bằng QR_SEPAY
     @Transactional
     public void completeOrderPayment(String orderNumber, BigDecimal paidAmount) {
         Order order = orderRepository.findByOrderNumber(orderNumber)

@@ -6,6 +6,7 @@ import com.sapo.mock.clothing.exception.IdInvalidException;
 import com.sapo.mock.clothing.order.service.OrderService;
 import com.sapo.mock.clothing.util.SecurityUtil;
 import com.sapo.mock.clothing.util.annotation.ApiMessage;
+import com.sapo.mock.clothing.util.constant.OrderStatus;
 import com.sapo.mock.clothing.common.dto.response.ResultPaginationDTO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +27,8 @@ public class OrderController {
 
     @PostMapping
     @ApiMessage("Tạo mới đơn hàng thành công")
-    public ResponseEntity<ResOrderDTO> createOrder(@Valid @RequestBody ReqCreateOrderDTO dto) throws IdInvalidException {
+    public ResponseEntity<ResOrderDTO> createOrder(@Valid @RequestBody ReqCreateOrderDTO dto)
+            throws IdInvalidException {
         String username = SecurityUtil.getCurrentUserLogin()
                 .orElseThrow(() -> new IdInvalidException("Vui lòng đăng nhập"));
         ResOrderDTO newOrder = orderService.createOrder(dto, username);
@@ -44,7 +46,7 @@ public class OrderController {
     @ApiMessage("Lấy danh sách đơn hàng thành công")
     public ResponseEntity<ResultPaginationDTO> getAllOrders(
             Pageable pageable,
-            @RequestParam(required = false) com.sapo.mock.clothing.util.constant.OrderStatus status,
+            @RequestParam(required = false) OrderStatus status,
             @RequestParam(required = false) String search) {
         ResultPaginationDTO rs = orderService.getAllOrders(pageable, status, search);
         return ResponseEntity.ok(rs);

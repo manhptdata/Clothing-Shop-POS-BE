@@ -7,6 +7,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -21,8 +24,8 @@ public class OrderNotificationHelper {
             if (customerName == null || customerName.trim().isEmpty() || customerName.contains("Khách lẻ"))
                 customerName = "Khách lẻ";
 
-            java.text.DecimalFormat df = new java.text.DecimalFormat("#,###",
-                    new java.text.DecimalFormatSymbols(java.util.Locale.US));
+            DecimalFormat df = new DecimalFormat("#,###",
+                    new DecimalFormatSymbols(Locale.US));
             String amountFormatted = df.format(savedOrder.getTotalAmount()) + " VND";
 
             Notification createNotif = new Notification();
@@ -50,8 +53,8 @@ public class OrderNotificationHelper {
 
     public void sendPaymentFailureNotification(Order order, BigDecimal paidAmount) {
         try {
-            java.text.DecimalFormat df = new java.text.DecimalFormat("#,###",
-                    new java.text.DecimalFormatSymbols(java.util.Locale.US));
+            DecimalFormat df = new DecimalFormat("#,###",
+                    new DecimalFormatSymbols(Locale.US));
             String paidFormatted = df.format(paidAmount) + " VND";
             String totalFormatted = df.format(order.getTotalAmount()) + " VND";
 

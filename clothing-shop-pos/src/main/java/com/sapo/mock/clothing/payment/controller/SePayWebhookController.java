@@ -31,34 +31,35 @@ public class SePayWebhookController {
     public ResponseEntity<?> handleSePayWebhook(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @RequestBody SePayWebhookRequest request) {
-        
+
         System.out.println("Received SePay Webhook: " + request);
 
         // Kiểm tra Token bảo mật (Apikey hoặc Bearer Token)
         String expectedApikeyHeader = "Apikey " + webhookToken;
         String expectedBearerHeader = "Bearer " + webhookToken;
-        if (authHeader == null || (!authHeader.equals(expectedApikeyHeader) && !authHeader.equals(expectedBearerHeader))) {
+        if (authHeader == null
+                || (!authHeader.equals(expectedApikeyHeader) && !authHeader.equals(expectedBearerHeader))) {
             System.err.println("Cảnh báo: Yêu cầu Webhook không hợp lệ hoặc thiếu Token bảo mật.");
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("success", false, "message", "Unauthorized"));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("success", false, "message", "Unauthorized"));
         }
 
         // Chuyển khoản tiền vào
         if ("in".equalsIgnoreCase(request.getTransferType())) {
             String content = request.getContent() != null ? request.getContent() : "";
             Matcher matcher = ORDER_NUMBER_PATTERN.matcher(content);
-            
+
             if (matcher.find()) {
                 String matchedStr = matcher.group();
                 String orderNumber = matchedStr;
-                
-                // Nếu nội dung bị ngân hàng lọc bỏ dấu gạch ngang (VD: HD20260702009)
-                // Chúng ta sẽ khôi phục lại định dạng chuẩn HD-YYYYMMDD-XXX để tìm trong DB
+
+                // Nếu nội dung bị ngân hàng lọc bỏ dấu gạch ngang
                 if (!matchedStr.contains("-") && matchedStr.length() >= 13) {
                     String datePart = matchedStr.substring(2, 10);
                     String seqPart = matchedStr.substring(10);
                     orderNumber = "HD-" + datePart + "-" + seqPart;
                 }
-                
+
                 try {
                     orderService.completeOrderPayment(orderNumber, request.getTransferAmount());
                     System.out.println("Thanh toán thành công cho đơn hàng: " + orderNumber);

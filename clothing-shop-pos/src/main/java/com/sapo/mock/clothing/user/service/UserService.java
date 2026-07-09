@@ -1,5 +1,7 @@
 package com.sapo.mock.clothing.user.service;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -27,6 +29,7 @@ public class UserService {
 	 * @param username tên đăng nhập cần tìm
 	 * @return User nếu tìm thấy, null nếu không có
 	 */
+	@Cacheable(value = "users", key = "#username")
 	public User getUserByUsername(String username) {
 		return userRepository.findByUsername(username);
 	}
@@ -48,6 +51,7 @@ public class UserService {
 	 * @param refreshToken chuỗi refresh token mới, hoặc null khi logout
 	 * @param username     username của user cần cập nhật
 	 */
+	@CacheEvict(value = "users", key = "#username")
 	public void updateRefreshToken(String refreshToken, String username) {
 		User user = userRepository.findByUsername(username);
 		if (user != null) {

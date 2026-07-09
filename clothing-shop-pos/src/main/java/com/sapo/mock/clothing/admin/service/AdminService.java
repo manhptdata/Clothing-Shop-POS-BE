@@ -1,5 +1,6 @@
 package com.sapo.mock.clothing.admin.service;
 
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -64,6 +65,7 @@ public class AdminService {
 	}
 
 	// Cập nhật thông tin nhân viên
+	@CacheEvict(value = "users", allEntries = true)
 	@Transactional
 	public UserResponse updateEmployee(Integer id, UserUpdateRequest request) {
 		User user = userRepository.findById(id)
@@ -90,6 +92,7 @@ public class AdminService {
 	}
 
 	// 3. Khóa/Mở khóa tài khoản (Soft Delete/Active)
+	@CacheEvict(value = "users", allEntries = true)
 	@Transactional
 	public void toggleEmployeeStatus(Integer userId, boolean status) {
 		User user = userRepository.findById(userId)
