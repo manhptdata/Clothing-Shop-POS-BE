@@ -30,6 +30,7 @@ import com.sapo.mock.clothing.receipt.repository.StockLogRepository;
 import com.sapo.mock.clothing.receipt.repository.StockReceiptRepository;
 import com.sapo.mock.clothing.specification.StockReceiptSpecification;
 import com.sapo.mock.clothing.supplier.repository.SupplierRepository;
+import com.sapo.mock.clothing.user.repository.UserRepository;
 import com.sapo.mock.clothing.util.constant.ReceiptStatus;
 import com.sapo.mock.clothing.util.constant.StockLogReferenceType;
 import com.sapo.mock.clothing.util.constant.StockLogSource;
@@ -43,9 +44,8 @@ public class StockReceiptService implements IStockReceiptService {
 	private final StockReceiptRepository receiptRepository;
 	private final StockLogRepository stockLogRepository;
 	private final SupplierRepository supplierRepository;
-
-	// Thay thế WarehouseStockRepository bằng ProductVariantRepository
 	private final ProductVariantRepository variantRepository;
+	private final UserRepository userRepository;
 	private final NotificationService notificationService;
 
 	@Override
@@ -99,8 +99,8 @@ public class StockReceiptService implements IStockReceiptService {
 
 		receipt.setItems(items);
 		receipt.setTotalQuantity(totalQty);
-
-		// Lưu xuống DB
+		receipt.setTotalAmount(totalAmt); // Bug #11 fix: lưu tổng tiền vào DB
+		receipt.setCreatedBy(userId);     // Bug #12 fix: bỏ comment để lưu người tạo
 		StockReceipt savedReceipt = receiptRepository.save(receipt);
 
 		Notification notification = new Notification();
@@ -162,6 +162,7 @@ public class StockReceiptService implements IStockReceiptService {
 		}
 
 		receipt.setTotalQuantity(totalQty);
+		receipt.setTotalAmount(totalAmt); // Bug #11 fix: lưu tổng tiền khi cập nhật
 
 		StockReceipt savedReceipt = receiptRepository.save(receipt);
 
@@ -240,6 +241,10 @@ public class StockReceiptService implements IStockReceiptService {
 			log.setSource(StockLogSource.NHAP_HANG);
 			log.setNote("Nhập hàng từ phiếu " + receipt.getCode());
 
+			if (userId != null) {
+				log.setCreatedBy(userRepository.getReferenceById(userId));
+			}
+
 			stockLogRepository.save(log);
 		}
 
@@ -307,6 +312,10 @@ public class StockReceiptService implements IStockReceiptService {
 				log.setSource(StockLogSource.DIEU_CHINH);
 				log.setNote("Hủy duyệt phiếu nhập " + receipt.getCode());
 
+				if (userId != null) {
+					log.setCreatedBy(userRepository.getReferenceById(userId));
+				}
+
 				stockLogRepository.save(log);
 			}
 		}
@@ -357,6 +366,15 @@ public class StockReceiptService implements IStockReceiptService {
 		response.setCreatedBy(entity.getCreatedBy());
 		response.setConfirmedAt(entity.getConfirmedAt());
 		response.setConfirmedBy(entity.getConfirmedBy());
+
+		if (entity.getCreatedBy() != null) {
+			userRepository.findById(entity.getCreatedBy())
+					.ifPresent(user -> response.setCreatedByUsername(user.getFullName() != null ? user.getFullName() : user.getUsername()));
+		}
+		if (entity.getConfirmedBy() != null) {
+			userRepository.findById(entity.getConfirmedBy())
+					.ifPresent(user -> response.setConfirmedByUsername(user.getFullName() != null ? user.getFullName() : user.getUsername()));
+		}
 
 		// Map danh sách sản phẩm con và Tính tổng tiền
 		if (entity.getItems() != null) {

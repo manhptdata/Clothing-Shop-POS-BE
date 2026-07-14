@@ -25,6 +25,10 @@ import com.sapo.mock.clothing.returnorder.repository.ReturnOrderRepository;
 import com.sapo.mock.clothing.user.repository.UserRepository;
 import com.sapo.mock.clothing.util.constant.OrderStatus;
 import com.sapo.mock.clothing.util.constant.PointConstant;
+import com.sapo.mock.clothing.receipt.repository.StockLogRepository;
+import com.sapo.mock.clothing.util.constant.StockLogReferenceType;
+import com.sapo.mock.clothing.util.constant.StockLogSource;
+import com.sapo.mock.clothing.entity.StockLog;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -60,6 +64,7 @@ public class ReturnOrderService {
     private final PointHistoryRepository pointHistoryRepository;
     private final CustomerVoucherRepository customerVoucherRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final StockLogRepository stockLogRepository;
 
     @Transactional
     public ResReturnOrderDTO createReturn(ReqCreateReturnDTO dto, String username) {
@@ -148,8 +153,23 @@ public class ReturnOrderService {
                     .orElseThrow(() -> new ResourceNotFoundException("Sản phẩm phân loại ID " + returnItemDto.getVariantId() + " không tồn tại"));
 
             // Hoàn trả tồn kho
-            variant.setQuantity(variant.getQuantity() + returnItemDto.getQuantity());
+            int qtyBefore = variant.getQuantity();
+            int qtyAfter = qtyBefore + returnItemDto.getQuantity();
+            variant.setQuantity(qtyAfter);
             productVariantRepository.save(variant);
+
+            // Bug #20 fix: Ghi StockLog cho hành động trả hàng
+            StockLog stockLog = new StockLog();
+            stockLog.setVariant(variant);
+            stockLog.setQuantityBefore(qtyBefore);
+            stockLog.setQuantityChange(returnItemDto.getQuantity());
+            stockLog.setQuantityAfter(qtyAfter);
+            stockLog.setSource(StockLogSource.TRA_HANG);
+            stockLog.setReferenceType(StockLogReferenceType.RETURN);
+            stockLog.setReferenceId(order.getId());
+            stockLog.setNote("Khách trả hàng đơn " + order.getOrderNumber());
+            stockLog.setCreatedBy(createdBy);
+            stockLogRepository.save(stockLog);
 
             // Tính đơn giá hoàn lại sau khi trừ chiết khấu tỷ lệ, làm tròn đến hàng đơn vị VND
             BigDecimal unitPrice = originalItem.getUnitPrice();

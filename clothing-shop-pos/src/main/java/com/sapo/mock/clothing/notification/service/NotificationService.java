@@ -83,51 +83,72 @@ public class NotificationService {
         return emitter;
     }
 
-    /**
-     * Lưu thông báo vào DB và đẩy tới các clients qua SSE
-     */
     @Transactional
-    public Notification sendNotification(Notification notification) {
-        Notification saved = notificationRepository.save(notification);
-
-        List<SseSubscriber> deadSubscribers = new ArrayList<>();
-        for (SseSubscriber subscriber : subscribers) {
-            boolean shouldSend = false;
-
-            if (saved.getTargetUserId() != null) {
-                shouldSend = saved.getTargetUserId().equals(subscriber.userId);
-            } else if (saved.getTargetRole() != null) {
-                // Riêng LOW_STOCK gửi cho cả ADMIN và WH
-                if ("LOW_STOCK".equals(saved.getType())) {
-                    shouldSend = "ROLE_ADMIN".equals(subscriber.role) || "ROLE_WH".equals(subscriber.role);
-                } else {
-                    // Hỗ trợ targetRole dạng "ROLE_ADMIN,ROLE_WH"
-                    String[] roles = saved.getTargetRole().split(",");
-                    for (String r : roles) {
-                        if (r.trim().equals(subscriber.role)) {
-                            shouldSend = true;
-                            break;
-                        }
-                    }
+    public List<Notification> sendNotification(Notification template) {
+        List<Notification> toSave = new ArrayList<>();
+        
+        if (template.getTargetUserId() != null) {
+            toSave.add(template);
+        } else if (template.getTargetRole() != null) {
+            // LOW_STOCK gửi cho cả ADMIN và WH
+            if ("LOW_STOCK".equals(template.getType())) {
+                List<User> admins = userRepository.findByRoleName("ROLE_ADMIN");
+                List<User> whs = userRepository.findByRoleName("ROLE_WH");
+                List<User> combined = new ArrayList<>(admins);
+                combined.addAll(whs);
+                for (User u : combined) {
+                    toSave.add(cloneNotificationForUser(template, u.getId()));
                 }
             } else {
-                // Broadcast
-                shouldSend = true;
+                String[] roles = template.getTargetRole().split(",");
+                for (String r : roles) {
+                    List<User> users = userRepository.findByRoleName(r.trim());
+                    for (User u : users) {
+                        toSave.add(cloneNotificationForUser(template, u.getId()));
+                    }
+                }
             }
+        } else {
+            // Broadcast
+            List<User> activeUsers = userRepository.findByActiveTrue();
+            for (User u : activeUsers) {
+                toSave.add(cloneNotificationForUser(template, u.getId()));
+            }
+        }
 
-            if (shouldSend) {
-                try {
-                    subscriber.emitter.send(SseEmitter.event()
-                            .name("notification")
-                            .id(String.valueOf(saved.getId()))
-                            .data(saved));
-                } catch (IOException e) {
-                    deadSubscribers.add(subscriber);
+        List<Notification> savedList = notificationRepository.saveAll(toSave);
+
+        // SSE Broadcasting
+        List<SseSubscriber> deadSubscribers = new ArrayList<>();
+        for (SseSubscriber subscriber : subscribers) {
+            for (Notification saved : savedList) {
+                if (saved.getTargetUserId() != null && saved.getTargetUserId().equals(subscriber.userId)) {
+                    try {
+                        subscriber.emitter.send(SseEmitter.event()
+                                .name("notification")
+                                .id(String.valueOf(saved.getId()))
+                                .data(saved));
+                    } catch (IOException e) {
+                        deadSubscribers.add(subscriber);
+                    }
                 }
             }
         }
         subscribers.removeAll(deadSubscribers);
-        return saved;
+        return savedList;
+    }
+
+    private Notification cloneNotificationForUser(Notification template, Integer userId) {
+        Notification n = new Notification();
+        n.setTitle(template.getTitle());
+        n.setMessage(template.getMessage());
+        n.setType(template.getType());
+        n.setTargetUserId(userId);
+        n.setMetadata(template.getMetadata());
+        n.setCreatedAt(java.time.Instant.now());
+        n.setRead(false);
+        // targetRole can be null now since we resolved it to userId
+        return n;
     }
 
     /**
@@ -138,8 +159,7 @@ public class NotificationService {
         if (user == null) {
             throw new ResourceNotFoundException("Không tìm thấy người dùng: " + username);
         }
-        String roleName = user.getRole() != null ? user.getRole().getName() : "ROLE_UNKNOWN";
-        return notificationRepository.findActiveNotificationsForUser(user.getId(), roleName);
+        return notificationRepository.findActiveNotificationsForUser(user.getId());
     }
 
     /**
@@ -210,7 +230,8 @@ public class NotificationService {
                 orderNumber, requestedByUsername, reason);
         notification.setMetadata(metadataStr);
 
-        return sendNotification(notification);
+        List<Notification> results = sendNotification(notification);
+        return results.isEmpty() ? notification : results.get(0);
     }
 
     /**

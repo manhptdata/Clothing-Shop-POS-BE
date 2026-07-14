@@ -105,10 +105,15 @@ public class BirthdayVoucherScheduler {
             log.info(">> CRM PRO SUCCESS: Đã chuyển Voucher [{}] vào ví của khách hàng: {}",
                     voucher.getName(), customer.getFullName());
 
-            String testEmail = (customer.getEmail() != null) ? customer.getEmail() : "manhwakunchi@gmail.com";
-            java.util.concurrent.CompletableFuture.runAsync(() -> {
-                emailNotificationService.sendBirthdayVoucherEmail(testEmail, customer.getFullName(), voucher.getCode());
-            });
+            // Bug #17 fix: Chỉ gửi email nếu khách hàng có email hợp lệ. Không fallback sang email dev.
+            if (customer.getEmail() != null && !customer.getEmail().isBlank()) {
+                final String recipientEmail = customer.getEmail();
+                java.util.concurrent.CompletableFuture.runAsync(() -> {
+                    emailNotificationService.sendBirthdayVoucherEmail(recipientEmail, customer.getFullName(), voucher.getCode());
+                });
+            } else {
+                log.info(">> [CRM VOUCHER] Khách [{}] không có email, bỏ qua gửi mail sinh nhật.", customer.getFullName());
+            }
         }
     }
 

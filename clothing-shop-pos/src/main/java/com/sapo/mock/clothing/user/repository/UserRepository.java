@@ -21,6 +21,8 @@ public interface UserRepository extends JpaRepository<User, Integer>, JpaSpecifi
 
 	List<User> findByActiveTrue();
 
+	List<User> findByRoleName(String roleName);
+
 	List<User> findAll();
 
 	Optional<User> findById(Integer id);

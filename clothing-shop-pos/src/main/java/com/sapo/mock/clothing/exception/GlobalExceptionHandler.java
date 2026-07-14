@@ -11,6 +11,7 @@ import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -126,6 +127,18 @@ public class GlobalExceptionHandler {
 		response.setError("Lỗi hệ thống");
 		response.setMessage(exception.getMessage());
 		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+	}
+
+	/**
+	 * Xử lý lỗi tranh chấp dữ liệu (Optimistic Locking) khi nhiều người thao tác cùng lúc
+	 */
+	@ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+	public ResponseEntity<RestResponse<Object>> handleOptimisticLockingFailureException(ObjectOptimisticLockingFailureException exception) {
+		RestResponse<Object> response = new RestResponse<>();
+		response.setStatusCode(HttpStatus.CONFLICT.value());
+		response.setError("Dữ liệu đã bị thay đổi");
+		response.setMessage("Dữ liệu này vừa được cập nhật bởi một người khác. Vui lòng tải lại trang và thao tác lại!");
+		return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
 	}
 
     /**

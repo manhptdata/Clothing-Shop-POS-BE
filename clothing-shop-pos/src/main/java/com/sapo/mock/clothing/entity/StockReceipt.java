@@ -1,5 +1,6 @@
 package com.sapo.mock.clothing.entity;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -62,6 +63,9 @@ public class StockReceipt {
 
 	@Column(name = "total_quantity", nullable = false)
 	private Integer totalQuantity = 0;
+
+	@Column(name = "total_amount")
+	private BigDecimal totalAmount;
 
 	@OneToMany(mappedBy = "receipt", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<StockReceiptItem> items = new ArrayList<>();

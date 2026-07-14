@@ -11,6 +11,8 @@ import com.sapo.mock.clothing.customer.service.CustomerService;
 import com.sapo.mock.clothing.entity.Customer;
 import com.sapo.mock.clothing.entity.CustomerVoucher;
 import com.sapo.mock.clothing.entity.Order;
+import com.sapo.mock.clothing.exception.BadRequestException;
+import com.sapo.mock.clothing.exception.ResourceNotFoundException;
 import com.sapo.mock.clothing.util.constant.CustomerStatusEnum;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -106,7 +108,7 @@ public class CustomerServiceImpl implements CustomerService {
     @Transactional(readOnly = true)
     public CustomerResponse getCustomerById(Integer id) {
         Customer customer = customerRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy khách hàng với ID: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng với ID: " + id));
         return convertToResponse(customer);
     }
 
@@ -115,7 +117,7 @@ public class CustomerServiceImpl implements CustomerService {
     @Override
     public CustomerResponse createCustomer(CustomerCreateRequest request) {
         if (customerRepository.existsByPhone(request.getPhone())) {
-            throw new RuntimeException("Số điện thoại này đã tồn tại trên hệ thống!");
+            throw new BadRequestException("Số điện thoại này đã tồn tại trên hệ thống!");
         }
 
         Customer customer = new Customer();
@@ -137,10 +139,10 @@ public class CustomerServiceImpl implements CustomerService {
     @Transactional
     public CustomerResponse updateCustomer(Integer id, CustomerUpdateRequest request) {
         Customer customer = customerRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy khách hàng với ID: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng với ID: " + id));
 
         if (customerRepository.existsByPhoneAndIdNot(request.getPhone(), id)) {
-            throw new RuntimeException("Số điện thoại này đã được sử dụng bởi một khách hàng khác!");
+            throw new BadRequestException("Số điện thoại này đã được sử dụng bởi một khách hàng khác!");
         }
 
         // Map updated data from the request to the existing entity.
@@ -165,7 +167,7 @@ public class CustomerServiceImpl implements CustomerService {
     @Transactional
     public void deactivateCustomer(Integer id) {
         Customer customer = customerRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy khách hàng với ID: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng với ID: " + id));
 
         customer.setStatus(CustomerStatusEnum.INACTIVE);
         // 3. Lưu lại vào DB (Kích hoạt @PreUpdate cập nhật thời gian chỉnh sửa)
@@ -178,7 +180,7 @@ public class CustomerServiceImpl implements CustomerService {
     public void activateCustomer(Integer id) {
         // 1. Tìm khách hàng (Kể cả đang INACTIVE vẫn phải tìm ra để mở khóa)
         Customer customer = customerRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy khách hàng với ID: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng với ID: " + id));
 
         // 2. Chuyển trạng thái hoạt động trở lại thành ACTIVE
         customer.setStatus(CustomerStatusEnum.ACTIVE);
@@ -212,7 +214,7 @@ public class CustomerServiceImpl implements CustomerService {
     public Page<OrderHistoryResponse> getCustomerOrders(Integer customerId, String keyword, Pageable pageable) {
         // Kiểm tra xem khách hàng có tồn tại không trước khi lấy đơn
         if (!customerRepository.existsById(customerId)) {
-            throw new RuntimeException("Không tìm thấy khách hàng với ID: " + customerId);
+            throw new ResourceNotFoundException("Không tìm thấy khách hàng với ID: " + customerId);
         }
 
         // Gọi câu Query lấy Order vừa khai báo trong CustomerRepository
