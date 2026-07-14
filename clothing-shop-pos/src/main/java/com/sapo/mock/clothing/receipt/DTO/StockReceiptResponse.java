@@ -25,8 +25,10 @@ public class StockReceiptResponse {
 	// Chuyển sang Instant để đồng bộ với Entity
 	private Instant createdAt;
 	private Integer createdBy;
+	private String createdByUsername;
 	private Instant confirmedAt;
 	private Integer confirmedBy;
+	private String confirmedByUsername;
 
 	private List<StockReceiptItemResponse> items;
 

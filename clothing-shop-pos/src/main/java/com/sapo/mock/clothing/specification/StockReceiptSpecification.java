@@ -15,6 +15,7 @@ public class StockReceiptSpecification {
 	public static Specification<StockReceipt> filterReceipts(String search, ReceiptStatus status) {
 		return (root, query, criteriaBuilder) -> {
 			List<Predicate> predicates = new ArrayList<>();
+			predicates.add(criteriaBuilder.conjunction());
 
 			// Filter by status if provided
 			if (status != null) {

@@ -18,6 +18,8 @@ public class ProductResponse {
 	private LocalDateTime updatedAt;
 	private Integer updatedByUserID;
 	private Integer createdByUserID;
+	private String createdByUsername;
+	private String updatedByUsername;
 	private List<String> imageUrls;
 	private List<ProductAttributeResponse> attributes;
 	private List<ProductOptionResponse> options;

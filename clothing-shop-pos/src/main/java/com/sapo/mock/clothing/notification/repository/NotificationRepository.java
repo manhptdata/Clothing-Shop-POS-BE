@@ -11,12 +11,6 @@ import java.util.List;
 @Repository
 public interface NotificationRepository extends JpaRepository<Notification, Integer> {
 
-    @Query("SELECT n FROM Notification n WHERE " +
-           "(n.targetUserId = :userId) OR " +
-           "(n.targetRole = :role) OR " +
-           "(FUNCTION('FIND_IN_SET', :role, n.targetRole) > 0) OR " +
-           "(n.type = 'LOW_STOCK' AND (:role = 'ROLE_ADMIN' OR :role = 'ROLE_WH')) OR " +
-           "(n.targetUserId IS NULL AND n.targetRole IS NULL) " +
-           "ORDER BY n.createdAt DESC")
-    List<Notification> findActiveNotificationsForUser(@Param("userId") Integer userId, @Param("role") String role);
+    @Query("SELECT n FROM Notification n WHERE n.targetUserId = :userId ORDER BY n.createdAt DESC")
+    List<Notification> findActiveNotificationsForUser(@Param("userId") Integer userId);
 }

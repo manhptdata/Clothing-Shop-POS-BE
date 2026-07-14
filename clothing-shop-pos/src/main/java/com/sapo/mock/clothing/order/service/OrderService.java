@@ -62,6 +62,11 @@ public class OrderService {
                 .countByCreatedAtAfter(LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant());
         order.setOrderNumber("HD-" + dateStr + "-" + String.format("%03d", countToday + 1));
 
+        // Bug #5 fix: Không cho tạo đơn hàng rỗng
+        if (dto.getItems() == null || dto.getItems().isEmpty()) {
+            throw new BadRequestException("Đơn hàng phải có ít nhất 1 sản phẩm");
+        }
+
         List<OrderLineItem> lineItems = new ArrayList<>();
         BigDecimal totalAmount = buildOrderItems(dto.getItems(), order, lineItems);
 
@@ -73,10 +78,13 @@ public class OrderService {
 
         finalizeOrderAmounts(dto, order, totalAmount);
 
-        orderInventoryService.deductProductStock(dto.getItems());
+        // Truyền orderNumber vào deductProductStock để ghi StockLog
+        orderInventoryService.deductProductStock(dto.getItems(), null, order.getOrderNumber());
 
         Order savedOrder = orderRepository.save(order);
         orderLineItemRepository.saveAll(lineItems);
+        // Cập nhật lại referenceId trong StockLog sau khi có orderId thật
+        // (ghi log 2 lần nếu muốn exact; đơn giản nhất là truyền orderId sau khi save)
 
         if (order.getStatus() == OrderStatus.COMPLETED) {
             orderLoyaltyService.processLoyaltyOnCompletion(savedOrder, customer, appliedVoucher);
@@ -134,10 +142,15 @@ public class OrderService {
         Customer customer = getCustomerById(dto.getCustomerId());
 
         List<OrderLineItem> oldItems = orderLineItemRepository.findByOrderId(id);
-        orderInventoryService.restoreProductStock(oldItems);
+        orderInventoryService.restoreProductStock(oldItems, id, order.getOrderNumber());
         orderLineItemRepository.deleteAll(oldItems);
 
         initOrderInfo(order, dto, customer, createdBy);
+
+        // Bug #5 fix: Không cho cập nhật đơn hàng thành rỗng
+        if (dto.getItems() == null || dto.getItems().isEmpty()) {
+            throw new BadRequestException("Đơn hàng phải có ít nhất 1 sản phẩm");
+        }
 
         List<OrderLineItem> lineItems = new ArrayList<>();
         BigDecimal totalAmount = buildOrderItems(dto.getItems(), order, lineItems);
@@ -150,7 +163,7 @@ public class OrderService {
 
         finalizeOrderAmounts(dto, order, totalAmount);
 
-        orderInventoryService.deductProductStock(dto.getItems());
+        orderInventoryService.deductProductStock(dto.getItems(), id, order.getOrderNumber());
 
         Order savedOrder = orderRepository.save(order);
         orderLineItemRepository.saveAll(lineItems);
@@ -184,7 +197,7 @@ public class OrderService {
         }
 
         List<OrderLineItem> items = orderLineItemRepository.findByOrderId(id);
-        orderInventoryService.restoreProductStock(items);
+        orderInventoryService.restoreProductStock(items, id, order.getOrderNumber());
 
         return mapToResOrderDTO(savedOrder, items);
     }

@@ -33,6 +33,7 @@ import com.sapo.mock.clothing.product.DTO.ProductVariantResponse;
 import com.sapo.mock.clothing.product.repository.ProductRepository;
 import com.sapo.mock.clothing.product.repository.ProductVariantRepository;
 import com.sapo.mock.clothing.specification.ProductSpecification;
+import com.sapo.mock.clothing.user.repository.UserRepository;
 import com.sapo.mock.clothing.notification.service.NotificationService;
 import com.sapo.mock.clothing.entity.Notification;
 import com.sapo.mock.clothing.util.constant.NotificationConstants;
@@ -46,6 +47,7 @@ public class ProductService implements IProductService {
 	private final ProductAttributeService productAttributeService;
 	private final ProductVariantRepository productVariantRepository;
 	private final CategoryRepository categoryRepository;
+	private final UserRepository userRepository;
 	private final NotificationService notificationService;
 
 	// =========================================================================
@@ -376,6 +378,15 @@ public class ProductService implements IProductService {
 		response.setUpdatedAt(product.getUpdatedAt());
 		response.setUpdatedByUserID(product.getUpdatedBy());
 		response.setCreatedByUserID(product.getCreatedBy());
+
+		if (product.getCreatedBy() != null) {
+			userRepository.findById(product.getCreatedBy())
+					.ifPresent(user -> response.setCreatedByUsername(user.getFullName() != null ? user.getFullName() : user.getUsername()));
+		}
+		if (product.getUpdatedBy() != null) {
+			userRepository.findById(product.getUpdatedBy())
+					.ifPresent(user -> response.setUpdatedByUsername(user.getFullName() != null ? user.getFullName() : user.getUsername()));
+		}
 
 		if (product.getAttributes() != null && !product.getAttributes().isEmpty()) {
 			response.setAttributes(product.getAttributes().stream()
