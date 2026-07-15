@@ -39,7 +39,7 @@ public class OrderInventoryService {
     public void deductProductStock(List<ReqCreateOrderDTO.OrderItemDTO> items,
                                    Integer orderId, String orderNumber) {
         for (ReqCreateOrderDTO.OrderItemDTO itemDto : items) {
-            ProductVariant variant = productVariantRepository.findById(itemDto.getVariantId())
+            ProductVariant variant = productVariantRepository.findByIdWithPessimisticLock(itemDto.getVariantId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Không tìm thấy sản phẩm ID " + itemDto.getVariantId()));
 
@@ -123,7 +123,7 @@ public class OrderInventoryService {
      */
     public void restoreProductStock(List<OrderLineItem> items, Integer orderId, String orderNumber) {
         for (OrderLineItem item : items) {
-            ProductVariant variant = productVariantRepository.findById(item.getVariantId())
+            ProductVariant variant = productVariantRepository.findByIdWithPessimisticLock(item.getVariantId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Không tìm thấy thông tin tồn kho của sản phẩm ID " + item.getVariantId()));
 

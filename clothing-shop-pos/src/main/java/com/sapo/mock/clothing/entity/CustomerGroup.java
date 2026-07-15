@@ -45,7 +45,6 @@ public class CustomerGroup {
     private RankCodeEnum code;
 
     private BigDecimal minSpending; // Chi tiêu tối thiểu
-    private BigDecimal maxSpending; // Chi tiêu tối đa
 
     // Voucher sinh nhật dành cho hạng này (chủ cửa hàng tự chọn từ danh sách voucher đã tạo)
     @ManyToOne(fetch = FetchType.LAZY)

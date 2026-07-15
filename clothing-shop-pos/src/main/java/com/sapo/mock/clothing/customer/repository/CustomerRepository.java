@@ -3,10 +3,12 @@ package com.sapo.mock.clothing.customer.repository;
 import com.sapo.mock.clothing.entity.Customer;
 import com.sapo.mock.clothing.entity.Order;
 import com.sapo.mock.clothing.util.constant.CustomerStatusEnum;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -14,6 +16,8 @@ import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
+
 
 @Repository
 public interface CustomerRepository extends JpaRepository<Customer, Integer>, JpaSpecificationExecutor<Customer> {
@@ -58,6 +62,10 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer>, Jp
         @Query("SELECT o FROM Order o WHERE o.customerId = :customerId AND (:keyword IS NULL OR :keyword = '' OR LOWER(o.orderNumber) LIKE LOWER(CONCAT('%', :keyword, '%')))")
         Page<Order> findOrdersByCustomerId(@Param("customerId") Integer customerId, @Param("keyword") String keyword, Pageable pageable);
 
+        // Lấy danh sách khách hàng (Trừ khách vãng lai id = 1) để batch processing
+        @Query("SELECT c FROM Customer c WHERE c.id != 1")
+        Page<Customer> findAllExcludeGuest(Pageable pageable);
+
         // Lấy danh sách khách hàng đang hoạt động để chạy quét hạ
         // hạng ngầm
         List<Customer> findByStatus(com.sapo.mock.clothing.util.constant.CustomerStatusEnum status);
@@ -86,4 +94,8 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer>, Jp
         @org.springframework.data.jpa.repository.Modifying
         @Query("UPDATE Customer c SET c.customerGroup = null WHERE c.customerGroup.id = :groupId")
         void removeGroupFromAllCustomers(@Param("groupId") Integer groupId);
+
+        @Lock(LockModeType.PESSIMISTIC_WRITE)
+        @Query("SELECT c FROM Customer c WHERE c.id = :id")
+        Optional<Customer> findByIdWithPessimisticLock(@Param("id") Integer id);
 }

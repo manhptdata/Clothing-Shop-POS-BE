@@ -207,7 +207,7 @@ public class CustomerGroupController {
     public ResponseEntity<RestResponse<java.util.List<VoucherResponse>>> getAllVouchers(@RequestParam(required = false) VoucherCampaignStatusEnum status) {
         java.util.List<VoucherResponse> vouchers = voucherRepository.findAll().stream()
                 .filter(v -> status == null || status.equals(v.getStatus()))
-                .map(v -> new VoucherResponse(v.getId(), v.getName(), v.getCode(), v.getDiscountAmount(), v.getMinOrderValue(), v.getStatus()))
+                .map(v -> new VoucherResponse(v.getId(), v.getName(), v.getCode(), v.getDiscountAmount(), v.getDiscountType(), v.getMaxDiscountAmount(), v.getMinOrderValue(), v.getStatus()))
                 .collect(java.util.stream.Collectors.toList());
         return ResponseEntity.ok(new RestResponse<>(HttpStatus.OK.value(), null, "Lấy danh sách voucher thành công", vouchers));
     }
@@ -224,10 +224,12 @@ public class CustomerGroupController {
         voucher.setDiscountAmount(request.getDiscountAmount());
         voucher.setMinOrderValue(request.getMinOrderValue());
         voucher.setStatus(VoucherCampaignStatusEnum.ACTIVE);
+        voucher.setDiscountType(request.getDiscountType());
+        voucher.setMaxDiscountAmount(request.getMaxDiscountAmount());
         
         voucher = voucherRepository.save(voucher);
         
-        VoucherResponse response = new VoucherResponse(voucher.getId(), voucher.getName(), voucher.getCode(), voucher.getDiscountAmount(), voucher.getMinOrderValue(), voucher.getStatus());
+        VoucherResponse response = new VoucherResponse(voucher.getId(), voucher.getName(), voucher.getCode(), voucher.getDiscountAmount(), voucher.getDiscountType(), voucher.getMaxDiscountAmount(), voucher.getMinOrderValue(), voucher.getStatus());
         return ResponseEntity.ok(new RestResponse<>(HttpStatus.OK.value(), null, "Tạo voucher thành công", response));
     }
     @PutMapping("/vouchers/{id}")
@@ -245,10 +247,12 @@ public class CustomerGroupController {
         voucher.setCode(request.getCode());
         voucher.setDiscountAmount(request.getDiscountAmount());
         voucher.setMinOrderValue(request.getMinOrderValue());
+        voucher.setDiscountType(request.getDiscountType());
+        voucher.setMaxDiscountAmount(request.getMaxDiscountAmount());
         
         voucher = voucherRepository.save(voucher);
         
-        VoucherResponse response = new VoucherResponse(voucher.getId(), voucher.getName(), voucher.getCode(), voucher.getDiscountAmount(), voucher.getMinOrderValue(), voucher.getStatus());
+        VoucherResponse response = new VoucherResponse(voucher.getId(), voucher.getName(), voucher.getCode(), voucher.getDiscountAmount(), voucher.getDiscountType(), voucher.getMaxDiscountAmount(), voucher.getMinOrderValue(), voucher.getStatus());
         return ResponseEntity.ok(new RestResponse<>(HttpStatus.OK.value(), null, "Cập nhật voucher thành công", response));
     }
 
@@ -266,7 +270,7 @@ public class CustomerGroupController {
         }
         voucher = voucherRepository.save(voucher);
 
-        VoucherResponse response = new VoucherResponse(voucher.getId(), voucher.getName(), voucher.getCode(), voucher.getDiscountAmount(), voucher.getMinOrderValue(), voucher.getStatus());
+        VoucherResponse response = new VoucherResponse(voucher.getId(), voucher.getName(), voucher.getCode(), voucher.getDiscountAmount(), voucher.getDiscountType(), voucher.getMaxDiscountAmount(), voucher.getMinOrderValue(), voucher.getStatus());
         String msg = VoucherCampaignStatusEnum.ACTIVE.equals(voucher.getStatus()) ? "Đã bật phát hành voucher" : "Đã tạm dừng phát hành voucher";
         return ResponseEntity.ok(new RestResponse<>(HttpStatus.OK.value(), null, msg, response));
     }
