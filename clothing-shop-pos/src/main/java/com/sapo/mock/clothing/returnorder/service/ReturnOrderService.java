@@ -205,27 +205,6 @@ public class ReturnOrderService {
         ReturnOrder savedReturnOrder = returnOrderRepository.save(returnOrder);
         returnOrderLineItemRepository.saveAll(returnLineItems);
 
-        // Khấu trừ điểm và doanh số chi tiêu của khách hàng (Nếu không phải Khách vãng lai)
-        if (customer.getId() != 1) {
-            // Khấu trừ điểm tương ứng với giá trị hoàn tiền
-            int pointsToDeduct = computedRefundAmount.divideToIntegralValue(PointConstant.EARN_RATE).intValue();
-            if (pointsToDeduct > 0) {
-                customer.setRewardPoints(Math.max(0, customer.getRewardPoints() - pointsToDeduct));
-                
-                PointHistory phDeduct = new PointHistory();
-                phDeduct.setCustomerId(customer.getId());
-                phDeduct.setOrderId(order.getId());
-                phDeduct.setPointsChange(-pointsToDeduct);
-                phDeduct.setType(PointConstant.TYPE_REFUND);
-                phDeduct.setDescription("Khấu trừ điểm tích lũy do khách trả hàng đơn " + order.getOrderNumber());
-                pointHistoryRepository.save(phDeduct);
-            }
-            customerRepository.save(customer);
-
-            // Gửi sự kiện cập nhật tổng chi tiêu (event với số tiền âm) để recheck nâng/hạ hạng tự động
-            eventPublisher.publishEvent(new OrderCompletedEvent(customer.getId(), computedRefundAmount.negate()));
-        }
-
         // Cập nhật trạng thái đơn hàng gốc
         boolean isAllReturned = true;
         for (OrderLineItem originalItem : originalItems) {
@@ -243,12 +222,60 @@ public class ReturnOrderService {
             }
         }
 
+        // Khấu trừ điểm và doanh số chi tiêu của khách hàng (Nếu không phải Khách vãng lai)
+        if (customer.getId() != 1) {
+            if (isAllReturned) {
+                // Trả hàng toàn bộ → hoàn chính xác điểm đã dùng + trừ chính xác điểm đã tích
+                if (order.getPointsUsed() > 0) {
+                    customer.setRewardPoints(customer.getRewardPoints() + order.getPointsUsed());
+                    PointHistory phRefund = new PointHistory();
+                    phRefund.setCustomerId(customer.getId());
+                    phRefund.setOrderId(order.getId());
+                    phRefund.setPointsChange(order.getPointsUsed());
+                    phRefund.setType(PointConstant.TYPE_REFUND);
+                    phRefund.setDescription("Hoàn điểm đã dùng do khách trả hàng toàn bộ đơn " + order.getOrderNumber());
+                    pointHistoryRepository.save(phRefund);
+                }
+                if (order.getPointsEarned() > 0) {
+                    customer.setRewardPoints(Math.max(0, customer.getRewardPoints() - order.getPointsEarned()));
+                    PointHistory phDeduct = new PointHistory();
+                    phDeduct.setCustomerId(customer.getId());
+                    phDeduct.setOrderId(order.getId());
+                    phDeduct.setPointsChange(-order.getPointsEarned());
+                    phDeduct.setType(PointConstant.TYPE_REFUND);
+                    phDeduct.setDescription("Trừ điểm tích lũy do khách trả hàng toàn bộ đơn " + order.getOrderNumber());
+                    pointHistoryRepository.save(phDeduct);
+                }
+            } else {
+                // Trả hàng một phần → chỉ khấu trừ điểm tích lũy tương ứng với giá trị hoàn tiền
+                int pointsToDeduct = computedRefundAmount.divideToIntegralValue(PointConstant.EARN_RATE).intValue();
+                if (pointsToDeduct > 0) {
+                    customer.setRewardPoints(Math.max(0, customer.getRewardPoints() - pointsToDeduct));
+                    PointHistory phDeduct = new PointHistory();
+                    phDeduct.setCustomerId(customer.getId());
+                    phDeduct.setOrderId(order.getId());
+                    phDeduct.setPointsChange(-pointsToDeduct);
+                    phDeduct.setType(PointConstant.TYPE_REFUND);
+                    phDeduct.setDescription("Khấu trừ điểm tích lũy do khách trả hàng một phần đơn " + order.getOrderNumber());
+                    pointHistoryRepository.save(phDeduct);
+                }
+            }
+            customerRepository.save(customer);
+
+            // Gửi sự kiện cập nhật tổng chi tiêu (event với số tiền âm) để recheck nâng/hạ hạng tự động
+            eventPublisher.publishEvent(new OrderCompletedEvent(customer.getId(), computedRefundAmount.negate()));
+        }
+
         if (isAllReturned) {
             order.setStatus(OrderStatus.RETURNED);
             
             // Hoàn voucher về trạng thái chưa dùng nếu trả hàng toàn bộ 100%
             customerVoucherRepository.findByOrderId(order.getId()).ifPresent(cv -> {
-                cv.setStatus(com.sapo.mock.clothing.util.constant.CustomerVoucherStatusEnum.UNUSED);
+                if (cv.getExpiredAt().isBefore(Instant.now())) {
+                    cv.setStatus(com.sapo.mock.clothing.util.constant.CustomerVoucherStatusEnum.EXPIRED);
+                } else {
+                    cv.setStatus(com.sapo.mock.clothing.util.constant.CustomerVoucherStatusEnum.UNUSED);
+                }
                 cv.setUsedAt(null);
                 cv.setOrderId(null);
                 customerVoucherRepository.save(cv);

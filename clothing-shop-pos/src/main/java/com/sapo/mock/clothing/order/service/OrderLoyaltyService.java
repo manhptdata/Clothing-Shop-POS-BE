@@ -94,9 +94,23 @@ public class OrderLoyaltyService {
         }
     }
 
+    public void reserveVoucher(CustomerVoucher voucher, Integer orderId) {
+        if (voucher != null) {
+            voucher.setStatus(CustomerVoucherStatusEnum.RESERVED);
+            voucher.setOrderId(orderId);
+            customerVoucherRepository.save(voucher);
+        }
+    }
+
     public void revertLoyaltyOnCancel(Order savedOrder, Customer customer) {
         customerVoucherRepository.findByOrderId(savedOrder.getId()).ifPresent(cv -> {
-            cv.setStatus(CustomerVoucherStatusEnum.UNUSED);
+            if (cv.getStatus() == CustomerVoucherStatusEnum.USED || cv.getStatus() == CustomerVoucherStatusEnum.RESERVED) {
+                if (cv.getExpiredAt().isBefore(Instant.now())) {
+                    cv.setStatus(CustomerVoucherStatusEnum.EXPIRED);
+                } else {
+                    cv.setStatus(CustomerVoucherStatusEnum.UNUSED);
+                }
+            }
             cv.setUsedAt(null);
             cv.setOrderId(null);
             customerVoucherRepository.save(cv);
@@ -127,8 +141,8 @@ public class OrderLoyaltyService {
         pointHistoryRepository.save(ph);
     }
 
-    public CustomerVoucher getAppliedVoucher(Integer customerId, String voucherCode) {
-        if (voucherCode == null || voucherCode.trim().isEmpty()) return null;
-        return customerVoucherRepository.findUnusedVoucherByCustomerAndCode(customerId, voucherCode.trim()).orElse(null);
+    public CustomerVoucher getAppliedVoucher(Integer orderId) {
+        if (orderId == null) return null;
+        return customerVoucherRepository.findByOrderId(orderId).orElse(null);
     }
 }

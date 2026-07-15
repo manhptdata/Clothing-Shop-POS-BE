@@ -86,6 +86,10 @@ public class OrderService {
         // Cập nhật lại referenceId trong StockLog sau khi có orderId thật
         // (ghi log 2 lần nếu muốn exact; đơn giản nhất là truyền orderId sau khi save)
 
+        if (order.getStatus() == OrderStatus.PENDING && appliedVoucher != null) {
+            orderLoyaltyService.reserveVoucher(appliedVoucher, savedOrder.getId());
+        }
+
         if (order.getStatus() == OrderStatus.COMPLETED) {
             orderLoyaltyService.processLoyaltyOnCompletion(savedOrder, customer, appliedVoucher);
             eventPublisher
@@ -185,6 +189,9 @@ public class OrderService {
         if (order.getStatus() == OrderStatus.CANCELLED) {
             throw new BadRequestException("Đơn hàng này đã bị hủy trước đó");
         }
+        if (order.getStatus() == OrderStatus.RETURNED || order.getStatus() == OrderStatus.PARTIALLY_RETURNED) {
+            throw new BadRequestException("Không thể hủy đơn hàng đã có trả hàng. Vui lòng xử lý qua phiếu trả hàng.");
+        }
 
         OrderStatus previousStatus = order.getStatus();
         order.setStatus(OrderStatus.CANCELLED);
@@ -192,7 +199,7 @@ public class OrderService {
 
         Customer customer = getCustomerById(order.getCustomerId());
 
-        if (previousStatus == OrderStatus.COMPLETED) {
+        if (previousStatus == OrderStatus.COMPLETED || previousStatus == OrderStatus.PENDING) {
             orderLoyaltyService.revertLoyaltyOnCancel(savedOrder, customer);
         }
 
@@ -324,8 +331,7 @@ public class OrderService {
         Order savedOrder = orderRepository.save(order);
         Customer customer = getCustomerById(savedOrder.getCustomerId());
 
-        CustomerVoucher appliedVoucher = orderLoyaltyService.getAppliedVoucher(customer.getId(),
-                savedOrder.getVoucherCode());
+        CustomerVoucher appliedVoucher = orderLoyaltyService.getAppliedVoucher(savedOrder.getId());
 
         orderLoyaltyService.processLoyaltyOnCompletion(savedOrder, customer, appliedVoucher);
         eventPublisher.publishEvent(new OrderCompletedEvent(savedOrder.getCustomerId(), savedOrder.getTotalAmount()));
