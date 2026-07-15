@@ -24,7 +24,6 @@ public class CustomerGroupRequest {
     @NotNull(message = "Chi tiêu tối thiểu không được để trống")
     private BigDecimal minSpending;
 
-    private BigDecimal maxSpending;
 
     private Integer birthdayVoucherId; // ID của Voucher sinh nhật (chọn từ dropdown trên UI)
 

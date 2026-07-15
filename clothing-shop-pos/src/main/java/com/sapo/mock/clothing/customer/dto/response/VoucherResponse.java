@@ -15,6 +15,8 @@ public class VoucherResponse {
     private String name;
     private String code;
     private BigDecimal discountAmount;
+    private com.sapo.mock.clothing.util.constant.VoucherDiscountType discountType;
+    private BigDecimal maxDiscountAmount;
     private BigDecimal minOrderValue;
     private com.sapo.mock.clothing.util.constant.VoucherCampaignStatusEnum status;
 }

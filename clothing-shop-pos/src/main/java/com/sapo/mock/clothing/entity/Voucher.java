@@ -28,6 +28,13 @@ public class Voucher {
     @Column(name = "discount_amount", nullable = false)
     private BigDecimal discountAmount;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "discount_type", nullable = false, length = 20)
+    private com.sapo.mock.clothing.util.constant.VoucherDiscountType discountType = com.sapo.mock.clothing.util.constant.VoucherDiscountType.FIXED_AMOUNT;
+
+    @Column(name = "max_discount_amount")
+    private BigDecimal maxDiscountAmount;
+
     @Column(name = "min_order_value")
     private BigDecimal minOrderValue;
 

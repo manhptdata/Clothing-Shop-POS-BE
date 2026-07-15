@@ -16,5 +16,9 @@ public class VoucherRequest {
     @NotNull(message = "Mức giảm giá không được để trống")
     private BigDecimal discountAmount;
 
+    private com.sapo.mock.clothing.util.constant.VoucherDiscountType discountType = com.sapo.mock.clothing.util.constant.VoucherDiscountType.FIXED_AMOUNT;
+
+    private BigDecimal maxDiscountAmount;
+
     private BigDecimal minOrderValue;
 }

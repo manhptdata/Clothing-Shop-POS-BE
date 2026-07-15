@@ -23,7 +23,6 @@ public class CustomerGroupResponse {
     private Long totalCustomers;
     private String note;
     private BigDecimal minSpending;
-    private BigDecimal maxSpending;
     private RankCodeEnum code;
     private Instant createdAt;
     private Integer birthdayVoucherId;

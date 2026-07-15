@@ -66,16 +66,13 @@ public class CustomerGroupServiceImpl implements CustomerGroupService {
     @Override
     @Transactional
     public CustomerGroupResponse createGroup(CustomerGroupRequest request) {
-        if (request.getMaxSpending() != null && request.getMinSpending() != null && request.getMinSpending().compareTo(request.getMaxSpending()) >= 0) {
-            throw new IllegalArgumentException("Chi tiêu tối đa phải lớn hơn chi tiêu tối thiểu");
-        }
+
 
         CustomerGroup group = new CustomerGroup();
         group.setName(request.getName());
         group.setDescription(request.getDescription());
         group.setCode(request.getCode());
         group.setMinSpending(request.getMinSpending());
-        group.setMaxSpending(request.getMaxSpending());
         group.setNote(request.getNote());
         group.setStatus(request.getStatus() != null ? request.getStatus() : CustomerStatusEnum.ACTIVE);
 
@@ -99,9 +96,7 @@ public class CustomerGroupServiceImpl implements CustomerGroupService {
     @Override
     @Transactional
     public CustomerGroupResponse updateGroup(Integer id, CustomerGroupRequest request) {
-        if (request.getMaxSpending() != null && request.getMinSpending() != null && request.getMinSpending().compareTo(request.getMaxSpending()) >= 0) {
-            throw new IllegalArgumentException("Chi tiêu tối đa phải lớn hơn chi tiêu tối thiểu");
-        }
+
 
         CustomerGroup group = customerGroupRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhóm khách hàng ID: " + id));
@@ -110,7 +105,6 @@ public class CustomerGroupServiceImpl implements CustomerGroupService {
         group.setDescription(request.getDescription());
         group.setCode(request.getCode());
         group.setMinSpending(request.getMinSpending());
-        group.setMaxSpending(request.getMaxSpending());
         group.setNote(request.getNote());
 
         // Cập nhật voucher sinh nhật (có thể xóa bằng cách gửi null)
@@ -158,24 +152,30 @@ public class CustomerGroupServiceImpl implements CustomerGroupService {
         // Sắp xếp nhóm giảm dần theo minSpending để ưu tiên nhóm cao nhất
         activeGroups.sort((g1, g2) -> g2.getMinSpending().compareTo(g1.getMinSpending()));
 
-        List<Customer> customers = customerRepository.findAll();
-        for (Customer customer : customers) {
-            java.math.BigDecimal totalSpent = customer.getTotalSpent() != null ? customer.getTotalSpent() : java.math.BigDecimal.ZERO;
+        int batchSize = 1000;
+        int page = 0;
+        Page<Customer> batch;
+        do {
+            org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, batchSize);
+            batch = customerRepository.findAllExcludeGuest(pageable);
+            
+            for (Customer customer : batch.getContent()) {
+                java.math.BigDecimal totalSpent = customer.getTotalSpent() != null ? customer.getTotalSpent() : java.math.BigDecimal.ZERO;
 
-            // Chỉ gán vào nhóm nếu thỏa mãn chính xác cả minSpending và maxSpending
-            CustomerGroup suitableGroup = null;
-            for (CustomerGroup group : activeGroups) {
-                if (group.getMinSpending() != null && totalSpent.compareTo(group.getMinSpending()) >= 0) {
-                    if (group.getMaxSpending() == null || totalSpent.compareTo(group.getMaxSpending()) < 0) {
+                // Lọc từ trên xuống, lấy ngay hạng đầu tiên thỏa mãn >= minSpending
+                CustomerGroup suitableGroup = null;
+                for (CustomerGroup group : activeGroups) {
+                    if (group.getMinSpending() != null && totalSpent.compareTo(group.getMinSpending()) >= 0) {
                         suitableGroup = group;
                         break;
                     }
                 }
-            }
 
-            customer.setCustomerGroup(suitableGroup);
-        }
-        customerRepository.saveAll(customers);
+                customer.setCustomerGroup(suitableGroup);
+            }
+            customerRepository.saveAll(batch.getContent());
+            page++;
+        } while (batch.hasNext());
     }    @Override
     public Page<com.sapo.mock.clothing.customer.dto.response.CustomerVoucherHistoryResponse> getVoucherHistory(String keyword, Pageable pageable) {
         String cleanKeyword = (keyword != null && !keyword.trim().isEmpty()) ? keyword.trim() : null;

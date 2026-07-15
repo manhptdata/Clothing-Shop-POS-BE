@@ -48,7 +48,16 @@ public class OrderLoyaltyService {
             throw new BadRequestException("Đơn hàng chưa đạt giá trị tối thiểu (" + voucher.getMinOrderValue() + ") để dùng voucher này");
         }
 
-        BigDecimal discount = voucher.getDiscountAmount().min(currentTotal);
+        BigDecimal discount = BigDecimal.ZERO;
+        if (com.sapo.mock.clothing.util.constant.VoucherDiscountType.PERCENTAGE.equals(voucher.getDiscountType())) {
+            discount = currentTotal.multiply(voucher.getDiscountAmount()).divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+            if (voucher.getMaxDiscountAmount() != null && voucher.getMaxDiscountAmount().compareTo(BigDecimal.ZERO) > 0) {
+                discount = discount.min(voucher.getMaxDiscountAmount());
+            }
+        } else {
+            discount = voucher.getDiscountAmount();
+        }
+        discount = discount.min(currentTotal);
         order.setVoucherCode(voucher.getCode());
         order.setDiscountFromVoucher(discount);
         return appliedVoucher;

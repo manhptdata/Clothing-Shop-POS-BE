@@ -58,6 +58,10 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer>, Jp
         @Query("SELECT o FROM Order o WHERE o.customerId = :customerId AND (:keyword IS NULL OR :keyword = '' OR LOWER(o.orderNumber) LIKE LOWER(CONCAT('%', :keyword, '%')))")
         Page<Order> findOrdersByCustomerId(@Param("customerId") Integer customerId, @Param("keyword") String keyword, Pageable pageable);
 
+        // Lấy danh sách khách hàng (Trừ khách vãng lai id = 1) để batch processing
+        @Query("SELECT c FROM Customer c WHERE c.id != 1")
+        Page<Customer> findAllExcludeGuest(Pageable pageable);
+
         // Lấy danh sách khách hàng đang hoạt động để chạy quét hạ
         // hạng ngầm
         List<Customer> findByStatus(com.sapo.mock.clothing.util.constant.CustomerStatusEnum status);
