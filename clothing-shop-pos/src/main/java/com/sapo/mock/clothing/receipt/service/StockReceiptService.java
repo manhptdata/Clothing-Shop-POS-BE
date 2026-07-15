@@ -195,7 +195,7 @@ public class StockReceiptService implements IStockReceiptService {
 		// 2. Vòng lặp cộng tồn kho thẳng vào ProductVariant & Ghi Log
 		for (StockReceiptItem item : receipt.getItems()) {
 			// Tìm biến thể thay vì tìm WarehouseStock
-			ProductVariant variant = variantRepository.findById(item.getVariant().getId()).orElseThrow(
+			ProductVariant variant = variantRepository.findByIdWithPessimisticLock(item.getVariant().getId()).orElseThrow(
 					() -> new BadRequestException("Không tìm thấy biến thể SP ID: " + item.getVariant().getId()));
 
 			if (!variant.getIsActive()) {
@@ -273,7 +273,7 @@ public class StockReceiptService implements IStockReceiptService {
 		// Nếu phiếu đang ở CONFIRMED, trừ tồn kho và rollback giá vốn MAC
 		if (receipt.getStatus() == ReceiptStatus.CONFIRMED) {
 			for (StockReceiptItem item : receipt.getItems()) {
-				ProductVariant variant = variantRepository.findById(item.getVariant().getId()).orElseThrow(
+				ProductVariant variant = variantRepository.findByIdWithPessimisticLock(item.getVariant().getId()).orElseThrow(
 						() -> new BadRequestException("Không tìm thấy biến thể SP ID: " + item.getVariant().getId()));
 
 				int oldQuantity = variant.getQuantity() != null ? variant.getQuantity() : 0;

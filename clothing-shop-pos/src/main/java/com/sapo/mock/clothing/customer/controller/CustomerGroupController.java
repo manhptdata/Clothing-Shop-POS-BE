@@ -270,7 +270,7 @@ public class CustomerGroupController {
         }
         voucher = voucherRepository.save(voucher);
 
-        VoucherResponse response = new VoucherResponse(voucher.getId(), voucher.getName(), voucher.getCode(), voucher.getDiscountAmount(), voucher.getMinOrderValue(), voucher.getStatus());
+        VoucherResponse response = new VoucherResponse(voucher.getId(), voucher.getName(), voucher.getCode(), voucher.getDiscountAmount(), voucher.getDiscountType(), voucher.getMaxDiscountAmount(), voucher.getMinOrderValue(), voucher.getStatus());
         String msg = VoucherCampaignStatusEnum.ACTIVE.equals(voucher.getStatus()) ? "Đã bật phát hành voucher" : "Đã tạm dừng phát hành voucher";
         return ResponseEntity.ok(new RestResponse<>(HttpStatus.OK.value(), null, msg, response));
     }

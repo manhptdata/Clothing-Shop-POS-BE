@@ -87,6 +87,8 @@ public class ReturnOrderService {
             throw new BadRequestException("Hóa đơn đã mua quá 7 ngày, không hỗ trợ trả hàng.");
         }
 
+        // Load customer thông thường để lấy thông tin (tên, id) cho phiếu trả hàng.
+        // Sẽ tải lại có Lock ngay trước khi thao tác điểm thưởng ở bên dưới.
         Customer customer = customerRepository.findById(order.getCustomerId())
                 .orElseThrow(() -> new ResourceNotFoundException("Khách hàng không tồn tại"));
 
@@ -149,7 +151,7 @@ public class ReturnOrderService {
                         + " chiếc. Số lượng muốn trả tiếp (" + returnItemDto.getQuantity() + ") vượt quá số lượng còn lại có thể trả (" + remainingAllowed + ").");
             }
 
-            ProductVariant variant = productVariantRepository.findById(returnItemDto.getVariantId())
+            ProductVariant variant = productVariantRepository.findByIdWithPessimisticLock(returnItemDto.getVariantId())
                     .orElseThrow(() -> new ResourceNotFoundException("Sản phẩm phân loại ID " + returnItemDto.getVariantId() + " không tồn tại"));
 
             // Hoàn trả tồn kho
@@ -224,12 +226,16 @@ public class ReturnOrderService {
 
         // Khấu trừ điểm và doanh số chi tiêu của khách hàng (Nếu không phải Khách vãng lai)
         if (customer.getId() != 1) {
+            // Re-fetch với Pessimistic Lock trước khi thạo tác điểm thưởng để tránh Lost Update
+            Customer lockedCustomer = customerRepository.findByIdWithPessimisticLock(customer.getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng ID: " + customer.getId()));
+
             if (isAllReturned) {
                 // Trả hàng toàn bộ → hoàn chính xác điểm đã dùng + trừ chính xác điểm đã tích
                 if (order.getPointsUsed() > 0) {
-                    customer.setRewardPoints(customer.getRewardPoints() + order.getPointsUsed());
+                    lockedCustomer.setRewardPoints(lockedCustomer.getRewardPoints() + order.getPointsUsed());
                     PointHistory phRefund = new PointHistory();
-                    phRefund.setCustomerId(customer.getId());
+                    phRefund.setCustomerId(lockedCustomer.getId());
                     phRefund.setOrderId(order.getId());
                     phRefund.setPointsChange(order.getPointsUsed());
                     phRefund.setType(PointConstant.TYPE_REFUND);
@@ -237,9 +243,9 @@ public class ReturnOrderService {
                     pointHistoryRepository.save(phRefund);
                 }
                 if (order.getPointsEarned() > 0) {
-                    customer.setRewardPoints(Math.max(0, customer.getRewardPoints() - order.getPointsEarned()));
+                    lockedCustomer.setRewardPoints(Math.max(0, lockedCustomer.getRewardPoints() - order.getPointsEarned()));
                     PointHistory phDeduct = new PointHistory();
-                    phDeduct.setCustomerId(customer.getId());
+                    phDeduct.setCustomerId(lockedCustomer.getId());
                     phDeduct.setOrderId(order.getId());
                     phDeduct.setPointsChange(-order.getPointsEarned());
                     phDeduct.setType(PointConstant.TYPE_REFUND);
@@ -250,9 +256,9 @@ public class ReturnOrderService {
                 // Trả hàng một phần → chỉ khấu trừ điểm tích lũy tương ứng với giá trị hoàn tiền
                 int pointsToDeduct = computedRefundAmount.divideToIntegralValue(PointConstant.EARN_RATE).intValue();
                 if (pointsToDeduct > 0) {
-                    customer.setRewardPoints(Math.max(0, customer.getRewardPoints() - pointsToDeduct));
+                    lockedCustomer.setRewardPoints(Math.max(0, lockedCustomer.getRewardPoints() - pointsToDeduct));
                     PointHistory phDeduct = new PointHistory();
-                    phDeduct.setCustomerId(customer.getId());
+                    phDeduct.setCustomerId(lockedCustomer.getId());
                     phDeduct.setOrderId(order.getId());
                     phDeduct.setPointsChange(-pointsToDeduct);
                     phDeduct.setType(PointConstant.TYPE_REFUND);
@@ -260,10 +266,10 @@ public class ReturnOrderService {
                     pointHistoryRepository.save(phDeduct);
                 }
             }
-            customerRepository.save(customer);
+            customerRepository.save(lockedCustomer);
 
             // Gửi sự kiện cập nhật tổng chi tiêu (event với số tiền âm) để recheck nâng/hạ hạng tự động
-            eventPublisher.publishEvent(new OrderCompletedEvent(customer.getId(), computedRefundAmount.negate()));
+            eventPublisher.publishEvent(new OrderCompletedEvent(lockedCustomer.getId(), computedRefundAmount.negate()));
         }
 
         if (isAllReturned) {

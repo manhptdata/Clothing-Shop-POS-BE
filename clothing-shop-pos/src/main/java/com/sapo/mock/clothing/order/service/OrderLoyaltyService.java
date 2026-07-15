@@ -9,6 +9,7 @@ import com.sapo.mock.clothing.entity.Order;
 import com.sapo.mock.clothing.entity.PointHistory;
 import com.sapo.mock.clothing.entity.Voucher;
 import com.sapo.mock.clothing.exception.BadRequestException;
+import com.sapo.mock.clothing.exception.ResourceNotFoundException;
 import com.sapo.mock.clothing.order.dto.ReqCreateOrderDTO;
 import com.sapo.mock.clothing.util.constant.CustomerVoucherStatusEnum;
 import com.sapo.mock.clothing.util.constant.PointConstant;
@@ -80,7 +81,7 @@ public class OrderLoyaltyService {
         order.setDiscountFromPoints(discount);
     }
 
-    public void processLoyaltyOnCompletion(Order savedOrder, Customer customer, CustomerVoucher appliedVoucher) {
+    public void processLoyaltyOnCompletion(Order savedOrder, Customer customerParam, CustomerVoucher appliedVoucher) {
         if (appliedVoucher != null) {
             appliedVoucher.setStatus(CustomerVoucherStatusEnum.USED);
             appliedVoucher.setUsedAt(Instant.now());
@@ -88,7 +89,12 @@ public class OrderLoyaltyService {
             customerVoucherRepository.save(appliedVoucher);
         }
 
-        if (customer.getId() != 1) {
+        if (customerParam.getId() != 1) {
+            // Re-fetch với Pessimistic Lock để đảm bảo không bị Lost Update
+            // khi 2 đơn hàng của cùng 1 khách được xử lý cùng lúc
+            Customer customer = customerRepository.findByIdWithPessimisticLock(customerParam.getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng ID: " + customerParam.getId()));
+
             if (savedOrder.getPointsUsed() > 0) {
                 customer.setRewardPoints(customer.getRewardPoints() - savedOrder.getPointsUsed());
                 savePointHistory(customer.getId(), savedOrder.getId(), -savedOrder.getPointsUsed(),
@@ -111,7 +117,7 @@ public class OrderLoyaltyService {
         }
     }
 
-    public void revertLoyaltyOnCancel(Order savedOrder, Customer customer) {
+    public void revertLoyaltyOnCancel(Order savedOrder, Customer customerParam) {
         customerVoucherRepository.findByOrderId(savedOrder.getId()).ifPresent(cv -> {
             if (cv.getStatus() == CustomerVoucherStatusEnum.USED || cv.getStatus() == CustomerVoucherStatusEnum.RESERVED) {
                 if (cv.getExpiredAt().isBefore(Instant.now())) {
@@ -125,7 +131,11 @@ public class OrderLoyaltyService {
             customerVoucherRepository.save(cv);
         });
 
-        if (customer.getId() != 1) {
+        if (customerParam.getId() != 1) {
+            // Re-fetch với Pessimistic Lock để đảm bảo không bị Lost Update
+            Customer customer = customerRepository.findByIdWithPessimisticLock(customerParam.getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng ID: " + customerParam.getId()));
+
             if (savedOrder.getPointsUsed() > 0) {
                 customer.setRewardPoints(customer.getRewardPoints() + savedOrder.getPointsUsed());
                 savePointHistory(customer.getId(), savedOrder.getId(), savedOrder.getPointsUsed(),
