@@ -8,4 +8,5 @@ public interface SystemSettingService {
     SystemSetting getSettingByKey(String key);
     SystemSetting updateSetting(String key, String value);
     boolean isReturnApprovalRequired();
+    boolean isCancelApprovalRequired();
 }

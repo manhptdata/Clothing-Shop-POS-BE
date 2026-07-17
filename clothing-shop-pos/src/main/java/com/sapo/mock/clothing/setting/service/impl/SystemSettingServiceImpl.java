@@ -16,6 +16,7 @@ public class SystemSettingServiceImpl implements SystemSettingService {
     private final SystemSettingRepository systemSettingRepository;
 
     public static final String SETTING_REQUIRE_RETURN_APPROVAL = "REQUIRE_RETURN_APPROVAL";
+    public static final String SETTING_REQUIRE_CANCEL_APPROVAL = "REQUIRE_CANCEL_APPROVAL";
 
     @Override
     public List<SystemSetting> getAllSettings() {
@@ -34,6 +35,8 @@ public class SystemSettingServiceImpl implements SystemSettingService {
             newSetting.setSettingKey(key);
             if (SETTING_REQUIRE_RETURN_APPROVAL.equals(key)) {
                 newSetting.setDescription("Yêu cầu duyệt trả hàng bằng mã PIN quản lý");
+            } else if (SETTING_REQUIRE_CANCEL_APPROVAL.equals(key)) {
+                newSetting.setDescription("Yêu cầu duyệt hủy đơn hàng bằng mã PIN quản lý");
             }
             return newSetting;
         });
@@ -44,6 +47,13 @@ public class SystemSettingServiceImpl implements SystemSettingService {
     @Override
     public boolean isReturnApprovalRequired() {
         SystemSetting setting = getSettingByKey(SETTING_REQUIRE_RETURN_APPROVAL);
+        // Default is true if not configured for better security
+        return setting == null || "true".equalsIgnoreCase(setting.getSettingValue());
+    }
+
+    @Override
+    public boolean isCancelApprovalRequired() {
+        SystemSetting setting = getSettingByKey(SETTING_REQUIRE_CANCEL_APPROVAL);
         // Default is true if not configured for better security
         return setting == null || "true".equalsIgnoreCase(setting.getSettingValue());
     }

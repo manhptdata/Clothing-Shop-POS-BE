@@ -97,6 +97,7 @@ public class ReturnOrderService {
             approvedByUsername = approvers.get(0).getUsername();
         }
 
+
         Order order = orderRepository.findById(dto.getOriginalOrderId())
                 .orElseThrow(() -> new ResourceNotFoundException("Hóa đơn gốc ID " + dto.getOriginalOrderId() + " không tồn tại"));
 
@@ -314,6 +315,10 @@ public class ReturnOrderService {
         } else {
             order.setStatus(OrderStatus.PARTIALLY_RETURNED);
         }
+        
+        // Trừ số tiền đã hoàn để OrderRepository tính doanh thu chính xác
+        order.setPaidAmount(order.getPaidAmount().subtract(computedRefundAmount));
+        order.setTotalAmount(order.getTotalAmount().subtract(computedRefundAmount));
         orderRepository.save(order);
 
         return mapToResReturnOrderDTO(savedReturnOrder, returnLineItems);

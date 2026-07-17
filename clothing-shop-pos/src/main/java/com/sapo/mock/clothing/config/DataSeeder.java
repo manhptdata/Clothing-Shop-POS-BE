@@ -41,6 +41,19 @@ public class DataSeeder implements CommandLineRunner {
             return roleRepository.save(role);
         });
 
+        // 1.5 Create MANAGER role
+        Role managerRole = roleRepository.findByName("ROLE_MANAGER").orElseGet(() -> {
+            Role role = new Role();
+            role.setName("ROLE_MANAGER");
+            role.setDescription("Cửa hàng trưởng");
+            role.setSystem(true);
+            Set<PermissionEnum> permissions = new HashSet<>(Arrays.asList(PermissionEnum.values()));
+            permissions.remove(PermissionEnum.MANAGE_USER);
+            permissions.remove(PermissionEnum.MANAGE_ROLE);
+            role.setPermissions(permissions);
+            return roleRepository.save(role);
+        });
+
         // 2. Create SALE role
         Role saleRole = roleRepository.findByName("ROLE_SALE").orElseGet(() -> {
             Role role = new Role();
@@ -49,7 +62,7 @@ public class DataSeeder implements CommandLineRunner {
             role.setSystem(true);
             Set<PermissionEnum> permissions = new HashSet<>(Arrays.asList(
                     PermissionEnum.VIEW_PRODUCT, PermissionEnum.VIEW_CATEGORY,
-                    PermissionEnum.CREATE_ORDER, PermissionEnum.VIEW_ORDER,
+                    PermissionEnum.CREATE_ORDER, PermissionEnum.VIEW_ORDER, PermissionEnum.CANCEL_ORDER,
                     PermissionEnum.CREATE_RETURN, PermissionEnum.VIEW_RETURN,
                     PermissionEnum.VIEW_CUSTOMER, PermissionEnum.VIEW_SHIFT
             ));

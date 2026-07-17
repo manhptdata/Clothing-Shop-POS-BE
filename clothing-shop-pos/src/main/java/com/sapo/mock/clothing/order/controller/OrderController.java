@@ -1,6 +1,7 @@
 package com.sapo.mock.clothing.order.controller;
 
 import com.sapo.mock.clothing.order.dto.ReqCreateOrderDTO;
+import com.sapo.mock.clothing.order.dto.ReqCancelOrderDTO;
 import com.sapo.mock.clothing.order.dto.ResOrderDTO;
 import com.sapo.mock.clothing.exception.IdInvalidException;
 import com.sapo.mock.clothing.order.service.OrderService;
@@ -65,8 +66,12 @@ public class OrderController {
 
     @PutMapping("/{id}/cancel")
     @ApiMessage("Hủy đơn hàng thành công")
-    public ResponseEntity<ResOrderDTO> cancelOrder(@PathVariable Integer id) {
-        ResOrderDTO canceledOrder = orderService.cancelOrder(id);
+    public ResponseEntity<ResOrderDTO> cancelOrder(
+            @PathVariable Integer id,
+            @Valid @RequestBody ReqCancelOrderDTO dto) throws IdInvalidException {
+        String username = SecurityUtil.getCurrentUserLogin()
+                .orElseThrow(() -> new IdInvalidException("Vui lòng đăng nhập"));
+        ResOrderDTO canceledOrder = orderService.cancelOrder(id, dto, username);
         return ResponseEntity.ok(canceledOrder);
     }
 

@@ -10,7 +10,9 @@ import com.sapo.mock.clothing.exception.ResourceNotFoundException;
 import com.sapo.mock.clothing.notification.repository.NotificationRepository;
 import com.sapo.mock.clothing.order.repository.OrderRepository;
 import com.sapo.mock.clothing.order.service.OrderService;
+import com.sapo.mock.clothing.order.dto.ReqCancelOrderDTO;
 import com.sapo.mock.clothing.user.repository.UserRepository;
+import com.sapo.mock.clothing.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -258,7 +260,10 @@ public class NotificationService {
                         .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng: " + orderNumber));
 
                 // Thực hiện hủy đơn trong database
-                orderService.cancelOrder(order.getId());
+                ReqCancelOrderDTO dto = new ReqCancelOrderDTO();
+                dto.setReason(notification.getMessage());
+                String approverUsername = SecurityUtil.getCurrentUserLogin().orElse("system");
+                orderService.cancelOrder(order.getId(), dto, approverUsername);
 
                 // Cập nhật thông báo
                 notification.setTitle("Đã phê duyệt HỦY đơn");
