@@ -85,6 +85,9 @@ public class Order {
 	@Column(columnDefinition = "TEXT")
 	private String note;
 
+	@Column(name = "cancel_reason", length = 255)
+	private String cancelReason;
+
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private Instant createdAt;
 

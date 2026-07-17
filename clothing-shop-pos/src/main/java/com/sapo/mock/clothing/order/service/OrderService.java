@@ -5,6 +5,7 @@ import com.sapo.mock.clothing.entity.*;
 import com.sapo.mock.clothing.exception.BadRequestException;
 import com.sapo.mock.clothing.exception.ResourceNotFoundException;
 import com.sapo.mock.clothing.order.dto.ReqCreateOrderDTO;
+import com.sapo.mock.clothing.order.dto.ReqCancelOrderDTO;
 import com.sapo.mock.clothing.order.dto.ResOrderDTO;
 import com.sapo.mock.clothing.order.repository.OrderLineItemRepository;
 import com.sapo.mock.clothing.order.repository.OrderRepository;
@@ -13,6 +14,7 @@ import com.sapo.mock.clothing.util.constant.OrderStatus;
 import com.sapo.mock.clothing.customer.repository.CustomerRepository;
 import com.sapo.mock.clothing.common.dto.response.ResultPaginationDTO;
 import com.sapo.mock.clothing.util.constant.PointConstant;
+import com.sapo.mock.clothing.setting.service.SystemSettingService;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -47,6 +49,7 @@ public class OrderService {
     private final OrderInventoryService orderInventoryService;
     private final OrderLoyaltyService orderLoyaltyService;
     private final OrderNotificationHelper orderNotificationHelper;
+    private final SystemSettingService systemSettingService;
 
     // Tạo đơn hàng mới
     @Transactional
@@ -58,9 +61,8 @@ public class OrderService {
         initOrderInfo(order, dto, customer, createdBy);
 
         String dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        long countToday = orderRepository
-                .countByCreatedAtAfter(LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant());
-        order.setOrderNumber("HD-" + dateStr + "-" + String.format("%03d", countToday + 1));
+        String timeStr = java.time.LocalTime.now().format(DateTimeFormatter.ofPattern("HHmmssSSS"));
+        order.setOrderNumber("HD-" + dateStr + "-" + timeStr);
 
         // Bug #5 fix: Không cho tạo đơn hàng rỗng
         if (dto.getItems() == null || dto.getItems().isEmpty()) {
@@ -184,8 +186,26 @@ public class OrderService {
 
     // Hủy đơn hàng
     @Transactional
-    public ResOrderDTO cancelOrder(Integer id) {
-        Order order = getOrderEntityById(id);
+    public ResOrderDTO cancelOrder(Integer id, ReqCancelOrderDTO dto, String username) {
+        Order order = orderRepository.findByIdWithPessimisticLock(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Đơn hàng ID " + id + " không tồn tại"));
+
+        if (order.getStatus() != OrderStatus.PENDING && systemSettingService.isCancelApprovalRequired()) {
+            if (dto.getApprovalPin() == null || dto.getApprovalPin().isEmpty()) {
+                throw new BadRequestException("Cần có mã PIN quản lý để duyệt hủy đơn hàng.");
+            }
+
+            // Kiểm tra PIN
+            List<User> approvers = userRepository.findAll().stream()
+                    .filter(u -> "ROLE_ADMIN".equals(u.getRole().getName()) || "ROLE_MANAGER".equals(u.getRole().getName()))
+                    .filter(u -> u.getSecurityPin() != null && u.getSecurityPin().equals(dto.getApprovalPin()))
+                    .toList();
+
+            if (approvers.isEmpty()) {
+                throw new BadRequestException("Mã PIN không chính xác hoặc người duyệt không có quyền.");
+            }
+        }
+
         if (order.getStatus() == OrderStatus.CANCELLED) {
             throw new BadRequestException("Đơn hàng này đã bị hủy trước đó");
         }
@@ -195,6 +215,9 @@ public class OrderService {
 
         OrderStatus previousStatus = order.getStatus();
         order.setStatus(OrderStatus.CANCELLED);
+        order.setCancelReason(dto.getReason());
+        order.setPaidAmount(BigDecimal.ZERO);
+        order.setTotalAmount(BigDecimal.ZERO);
         Order savedOrder = orderRepository.save(order);
 
         Customer customer = getCustomerById(order.getCustomerId());
@@ -310,7 +333,7 @@ public class OrderService {
     // Hoàn thành thanh toán đơn hàng bằng QR_SEPAY
     @Transactional
     public void completeOrderPayment(String orderNumber, BigDecimal paidAmount) {
-        Order order = orderRepository.findByOrderNumber(orderNumber)
+        Order order = orderRepository.findByOrderNumberWithPessimisticLock(orderNumber)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng: " + orderNumber));
 
         if (order.getStatus() != OrderStatus.PENDING) {

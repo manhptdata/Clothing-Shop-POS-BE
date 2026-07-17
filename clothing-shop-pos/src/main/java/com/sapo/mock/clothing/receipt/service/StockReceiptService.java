@@ -57,8 +57,9 @@ public class StockReceiptService implements IStockReceiptService {
 
 		StockReceipt receipt = new StockReceipt();
 
-		// Sinh mã phiếu tự động dựa trên timestamp
-		receipt.setCode("PN-" + System.currentTimeMillis());
+		// Sinh mã phiếu tự động dựa trên timestamp và chuỗi ngẫu nhiên
+		int randomNum = (int) (Math.random() * 1000);
+		receipt.setCode("PN-" + System.currentTimeMillis() + "-" + String.format("%03d", randomNum));
 
 		receipt.setSupplier(supplier);
 		receipt.setNote(request.getNote());

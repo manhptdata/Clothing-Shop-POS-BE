@@ -44,8 +44,8 @@ public class FormatRestResponse implements ResponseBodyAdvice<Object> {
             return body;
         }
 
-        // Không bọc nếu body đã là RestResponse (tránh double wrap) hoặc String
-        if (body instanceof RestResponse || body instanceof String) {
+        // Không bọc nếu body đã là RestResponse (tránh double wrap)
+        if (body instanceof RestResponse) {
             return body;
         }
 
@@ -56,6 +56,15 @@ public class FormatRestResponse implements ResponseBodyAdvice<Object> {
         // Lấy message từ @ApiMessage annotation trên method
         ApiMessage apiMessage = returnType.getMethodAnnotation(ApiMessage.class);
         wrappedResponse.setMessage(apiMessage != null ? apiMessage.value() : "Call API successfully");
+
+        if (body instanceof String) {
+            try {
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                return mapper.writeValueAsString(wrappedResponse);
+            } catch (Exception e) {
+                return body;
+            }
+        }
 
         return wrappedResponse;
     }
