@@ -57,6 +57,9 @@ public class ReturnOrder {
     @Column(columnDefinition = "TEXT")
     private String reason;
 
+    @Column(name = "approved_by_username", length = 50)
+    private String approvedByUsername;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

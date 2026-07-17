@@ -48,6 +48,13 @@ public class AdminService {
 		if (phone != null && userRepository.existsByPhone(phone)) {
 			throw new BadRequestException("Số điện thoại này đã tồn tại");
 		}
+        String email = request.getEmail();
+        if (email != null && email.trim().isEmpty()) {
+            email = null;
+        }
+        if (email != null && userRepository.existsByEmail(email)) {
+            throw new BadRequestException("Email này đã tồn tại");
+        }
 
 		Role role = roleRepository.findById(request.getRoleId())
 				.orElseThrow(() -> new BadRequestException("Vai trò không hợp lệ"));
@@ -57,6 +64,7 @@ public class AdminService {
 		user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
 		user.setFullName(request.getFullName());
 		user.setPhone(phone);
+        user.setEmail(email);
 		user.setRole(role);
 		user.setActive(true);
 
@@ -80,11 +88,21 @@ public class AdminService {
 			throw new BadRequestException("Số điện thoại này đã được sử dụng bởi nhân viên khác");
 		}
 
+        String email = request.getEmail();
+        if (email != null && email.trim().isEmpty()) {
+            email = null;
+        }
+
+        if (email != null && userRepository.existsByEmailAndIdNot(email, id)) {
+            throw new BadRequestException("Email này đã được sử dụng bởi nhân viên khác");
+        }
+
 		Role role = roleRepository.findById(request.getRoleId())
 				.orElseThrow(() -> new BadRequestException("Vai trò không hợp lệ"));
 
 		user.setFullName(request.getFullName());
 		user.setPhone(phone);
+        user.setEmail(email);
 		user.setRole(role);
 
 		userRepository.save(user);
@@ -113,7 +131,7 @@ public class AdminService {
 		String roleName = user.getRole() != null ? user.getRole().getName() : null;
 		Integer roleId = user.getRole() != null ? user.getRole().getId() : null;
 		return UserResponse.builder().id(user.getId()).username(user.getUsername()).fullName(user.getFullName())
-				.phone(user.getPhone()).role(roleName).active(user.isActive()).createdAt(user.getCreatedAt())
+				.phone(user.getPhone()).email(user.getEmail()).role(roleName).active(user.isActive()).createdAt(user.getCreatedAt())
 				.build();
 	}
 

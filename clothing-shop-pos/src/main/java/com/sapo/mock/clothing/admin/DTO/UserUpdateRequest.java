@@ -12,6 +12,8 @@ public class UserUpdateRequest {
 
     private String phone;
 
+    private String email;
+
     @NotNull(message = "Vai trò không được để trống")
     private Integer roleId;
 }

@@ -58,6 +58,9 @@ public class User implements UserDetails {
 	@Column(length = 15, unique = true)
 	private String phone;
 
+	@Column(length = 100, unique = true)
+	private String email;
+
 	@ManyToOne(fetch = jakarta.persistence.FetchType.EAGER)
 	@JoinColumn(name = "role_id")
 	private Role role;
@@ -71,6 +74,10 @@ public class User implements UserDetails {
 	@JsonIgnore
 	@Column(name = "refresh_token", columnDefinition = "TEXT")
 	private String refreshToken;
+
+	@JsonIgnore
+	@Column(name = "security_pin")
+	private String securityPin;
 
 	@PrePersist
 	public void prePersist() {

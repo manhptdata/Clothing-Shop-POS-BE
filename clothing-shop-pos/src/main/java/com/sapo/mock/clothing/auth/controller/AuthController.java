@@ -102,6 +102,7 @@ public class AuthController {
                 currentUser.getId(),
                 currentUser.getUsername(),
                 currentUser.getFullName(),
+                currentUser.getPhone(),
                 roleName,
                 perms);
         return ResponseEntity.ok(new ResLoginDTO.UserGetAccount(userLogin));
@@ -180,6 +181,7 @@ public class AuthController {
                 user.getId(),
                 user.getUsername(),
                 user.getFullName(),
+                user.getPhone(),
                 roleName,
                 perms));
         return dto;

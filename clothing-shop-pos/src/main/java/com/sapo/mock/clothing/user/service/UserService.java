@@ -72,4 +72,73 @@ public class UserService {
 		return userRepository.findByRefreshTokenAndUsername(refreshToken, username);
 	}
 
+	/**
+	 * Tạo mã PIN bảo mật ngẫu nhiên (6 số) cho user và mã hoá trước khi lưu.
+	 *
+	 * @param username Tên đăng nhập của user
+	 * @return Mã PIN dạng plain text (để trả về cho frontend hiển thị 1 lần)
+	 */
+	@CacheEvict(value = "users", key = "#username")
+	public String generateSecurityPin(String username) {
+		User user = userRepository.findByUsername(username);
+		if (user == null) {
+			throw new RuntimeException("User không tồn tại");
+		}
+		
+		// Generate random 6-digit PIN
+		int pin = (int) (Math.random() * 900000) + 100000;
+		String plainPin = String.valueOf(pin);
+		
+		user.setSecurityPin(plainPin); // Luu plaintext
+		userRepository.save(user);
+		
+		return plainPin;
+	}
+
+	@CacheEvict(value = "users", key = "#username")
+	public void changeSecurityPin(String username, String newPin) {
+		User user = userRepository.findByUsername(username);
+		if (user == null) {
+			throw new RuntimeException("User không tồn tại");
+		}
+		if (newPin == null || !newPin.matches("\\d{6}")) {
+			throw new RuntimeException("Mã PIN phải bao gồm 6 chữ số");
+		}
+		user.setSecurityPin(newPin); // Luu plaintext
+		userRepository.save(user);
+	}
+
+	public String getSecurityPin(String username) {
+		User user = userRepository.findByUsername(username);
+		if (user == null) {
+			throw new RuntimeException("User không tồn tại");
+		}
+		return user.getSecurityPin();
+	}
+
+	@CacheEvict(value = "users", key = "#username")
+	public void changePassword(String username, String oldPassword, String newPassword) {
+		User user = userRepository.findByUsername(username);
+		if (user == null) {
+			throw new RuntimeException("User không tồn tại");
+		}
+		if (!passwordEncoder.matches(oldPassword, user.getPasswordHash())) {
+			throw new RuntimeException("Mật khẩu cũ không chính xác");
+		}
+		user.setPasswordHash(passwordEncoder.encode(newPassword));
+		userRepository.save(user);
+	}
+
+	@CacheEvict(value = "users", allEntries = true)
+	public User updateUserProfileByAdmin(Integer userId, com.sapo.mock.clothing.user.dto.request.UpdateProfileRequest request) {
+		User user = userRepository.findById(userId)
+				.orElseThrow(() -> new RuntimeException("User không tồn tại"));
+
+		user.setFullName(request.getFullName());
+		user.setPhone(request.getPhone());
+		user.setEmail(request.getEmail());
+
+		return userRepository.save(user);
+	}
+
 }
