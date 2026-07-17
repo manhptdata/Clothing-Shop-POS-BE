@@ -98,7 +98,7 @@ public class ReturnOrderService {
         }
 
 
-        Order order = orderRepository.findById(dto.getOriginalOrderId())
+        Order order = orderRepository.findByIdWithPessimisticLock(dto.getOriginalOrderId())
                 .orElseThrow(() -> new ResourceNotFoundException("Hóa đơn gốc ID " + dto.getOriginalOrderId() + " không tồn tại"));
 
         // 1. Kiểm tra trạng thái đơn hàng gốc

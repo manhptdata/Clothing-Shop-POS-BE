@@ -61,9 +61,8 @@ public class OrderService {
         initOrderInfo(order, dto, customer, createdBy);
 
         String dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        long countToday = orderRepository
-                .countByCreatedAtAfter(LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant());
-        order.setOrderNumber("HD-" + dateStr + "-" + String.format("%03d", countToday + 1));
+        String timeStr = java.time.LocalTime.now().format(DateTimeFormatter.ofPattern("HHmmssSSS"));
+        order.setOrderNumber("HD-" + dateStr + "-" + timeStr);
 
         // Bug #5 fix: Không cho tạo đơn hàng rỗng
         if (dto.getItems() == null || dto.getItems().isEmpty()) {
@@ -334,7 +333,7 @@ public class OrderService {
     // Hoàn thành thanh toán đơn hàng bằng QR_SEPAY
     @Transactional
     public void completeOrderPayment(String orderNumber, BigDecimal paidAmount) {
-        Order order = orderRepository.findByOrderNumber(orderNumber)
+        Order order = orderRepository.findByOrderNumberWithPessimisticLock(orderNumber)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng: " + orderNumber));
 
         if (order.getStatus() != OrderStatus.PENDING) {

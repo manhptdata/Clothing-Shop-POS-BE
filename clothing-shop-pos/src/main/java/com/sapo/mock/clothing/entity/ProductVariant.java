@@ -62,6 +62,4 @@ public class ProductVariant {
 	@Column(name = "is_active", nullable = false)
 	private Boolean isActive = true;
 
-	@jakarta.persistence.Version
-	private Long version;
 }

@@ -24,6 +24,10 @@ public interface OrderRepository extends JpaRepository<Order, Integer>, JpaSpeci
     Optional<Order> findByOrderNumber(String orderNumber);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT o FROM Order o WHERE o.orderNumber = :orderNumber")
+    Optional<Order> findByOrderNumberWithPessimisticLock(@Param("orderNumber") String orderNumber);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT o FROM Order o WHERE o.id = :id")
     Optional<Order> findByIdWithPessimisticLock(@Param("id") Integer id);
 

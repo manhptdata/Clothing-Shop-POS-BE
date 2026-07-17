@@ -3,6 +3,7 @@ package com.sapo.mock.clothing.order.service;
 import com.sapo.mock.clothing.entity.*;
 import com.sapo.mock.clothing.exception.BadRequestException;
 import com.sapo.mock.clothing.exception.ResourceNotFoundException;
+import com.sapo.mock.clothing.order.dto.ReqCancelOrderDTO;
 import com.sapo.mock.clothing.order.dto.ReqCreateOrderDTO;
 import com.sapo.mock.clothing.order.dto.ResOrderDTO;
 import com.sapo.mock.clothing.order.repository.OrderLineItemRepository;
@@ -259,7 +260,9 @@ public class OrderServiceTest {
         when(orderLineItemRepository.findByOrderId(100)).thenReturn(Collections.singletonList(item));
         when(productVariantRepository.findById(10)).thenReturn(Optional.of(mockVariant));
 
-        ResOrderDTO result = orderService.cancelOrder(100);
+        ReqCancelOrderDTO cancelDto = new ReqCancelOrderDTO();
+        cancelDto.setReason("Test reason");
+        ResOrderDTO result = orderService.cancelOrder(100, cancelDto, "admin");
 
         assertEquals(OrderStatus.CANCELLED, order.getStatus());
         assertEquals(15, mockVariant.getQuantity()); // 10 + 5 returned
@@ -277,8 +280,10 @@ public class OrderServiceTest {
 
         when(orderRepository.findById(100)).thenReturn(Optional.of(order));
 
+        ReqCancelOrderDTO cancelDto = new ReqCancelOrderDTO();
+        cancelDto.setReason("Test reason");
         assertThrows(BadRequestException.class, () -> {
-            orderService.cancelOrder(100);
+            orderService.cancelOrder(100, cancelDto, "admin");
         });
     }
 
