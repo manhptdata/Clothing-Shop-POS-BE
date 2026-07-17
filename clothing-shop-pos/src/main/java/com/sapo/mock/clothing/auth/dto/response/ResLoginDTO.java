@@ -23,6 +23,7 @@ public class ResLoginDTO {
         private int id;
         private String username;
         private String fullName;
+        private String phone;
         private String role;
         private java.util.List<String> permissions;
     }
@@ -43,6 +44,7 @@ public class ResLoginDTO {
         private int id;
         private String username;
         private String fullName;
+        private String phone;
     }
 }
 

@@ -29,6 +29,8 @@ import com.sapo.mock.clothing.receipt.repository.StockLogRepository;
 import com.sapo.mock.clothing.util.constant.StockLogReferenceType;
 import com.sapo.mock.clothing.util.constant.StockLogSource;
 import com.sapo.mock.clothing.entity.StockLog;
+import com.sapo.mock.clothing.setting.service.SystemSettingService;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -65,12 +67,34 @@ public class ReturnOrderService {
     private final CustomerVoucherRepository customerVoucherRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final StockLogRepository stockLogRepository;
+    private final SystemSettingService systemSettingService;
+    private final PasswordEncoder passwordEncoder;
 
     @Transactional
     public ResReturnOrderDTO createReturn(ReqCreateReturnDTO dto, String username) {
         User createdBy = userRepository.findByUsername(username);
         if (createdBy == null) {
             throw new ResourceNotFoundException("Không tìm thấy người dùng: " + username);
+        }
+
+        String approvedByUsername = createdBy.getUsername();
+
+        // 0. Verify PIN if required
+        if (systemSettingService.isReturnApprovalRequired()) {
+            if (dto.getApprovalPin() == null || dto.getApprovalPin().isEmpty()) {
+                throw new BadRequestException("Cần có mã PIN quản lý để duyệt phiếu trả hàng.");
+            }
+
+            // Find an admin/manager who matches this PIN
+            List<User> approvers = userRepository.findAll().stream()
+                    .filter(u -> "ROLE_ADMIN".equals(u.getRole().getName()) || "ROLE_MANAGER".equals(u.getRole().getName()))
+                    .filter(u -> u.getSecurityPin() != null && u.getSecurityPin().equals(dto.getApprovalPin()))
+                    .toList();
+
+            if (approvers.isEmpty()) {
+                throw new BadRequestException("Mã PIN không chính xác hoặc người duyệt không có quyền.");
+            }
+            approvedByUsername = approvers.get(0).getUsername();
         }
 
         Order order = orderRepository.findById(dto.getOriginalOrderId())
@@ -126,6 +150,7 @@ public class ReturnOrderService {
         returnOrder.setCustomerName(customer.getFullName());
         returnOrder.setCreatedBy(createdBy.getId());
         returnOrder.setCreatedByUsername(createdBy.getUsername());
+        returnOrder.setApprovedByUsername(approvedByUsername);
         returnOrder.setReason(dto.getReason());
 
         String dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
@@ -352,6 +377,7 @@ public class ReturnOrderService {
                 .customerName(ro.getCustomerName())
                 .createdById(ro.getCreatedBy())
                 .createdByUsername(ro.getCreatedByUsername())
+                .approvedByUsername(ro.getApprovedByUsername())
                 .totalRefundAmount(ro.getTotalRefundAmount())
                 .reason(ro.getReason())
                 .createdAt(ro.getCreatedAt())

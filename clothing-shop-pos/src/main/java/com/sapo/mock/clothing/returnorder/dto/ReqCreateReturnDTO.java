@@ -16,6 +16,8 @@ public class ReqCreateReturnDTO {
 
     private String reason;
 
+    private String approvalPin;
+
     @NotNull(message = "Danh sách sản phẩm trả không được trống")
     @Valid
     private List<ReturnItemDTO> items;

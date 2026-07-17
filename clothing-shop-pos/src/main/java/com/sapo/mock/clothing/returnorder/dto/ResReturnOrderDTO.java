@@ -23,6 +23,7 @@ public class ResReturnOrderDTO {
     private String customerName;
     private Integer createdById;
     private String createdByUsername;
+    private String approvedByUsername;
     private BigDecimal totalRefundAmount;
     private String reason;
     private Instant createdAt;
