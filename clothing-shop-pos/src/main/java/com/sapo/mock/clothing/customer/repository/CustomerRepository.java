@@ -9,6 +9,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -91,7 +92,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer>, Jp
                                             @Param("keyword") String keyword,
                                             Pageable pageable);
 
-        @org.springframework.data.jpa.repository.Modifying
+        @Modifying
         @Query("UPDATE Customer c SET c.customerGroup = null WHERE c.customerGroup.id = :groupId")
         void removeGroupFromAllCustomers(@Param("groupId") Integer groupId);
 

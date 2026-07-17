@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -24,7 +25,7 @@ public class SePayWebhookController {
     private final OrderService orderService;
     private static final Pattern ORDER_NUMBER_PATTERN = Pattern.compile("HD-?\\d{8}-?\\d{3,}");
 
-    @org.springframework.beans.factory.annotation.Value("${sepay.webhook.token}")
+    @Value("${sepay.webhook.token}")
     private String webhookToken;
 
     @PostMapping("/sepay-webhook")

@@ -12,6 +12,11 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PathVariable;
+import jakarta.validation.Valid;
+import com.sapo.mock.clothing.user.dto.request.ChangePasswordRequest;
+import com.sapo.mock.clothing.user.dto.request.UpdateProfileRequest;
+import com.sapo.mock.clothing.entity.User;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -69,7 +74,7 @@ public class UserController {
     @PostMapping("/me/password")
     @ApiMessage("Đổi mật khẩu thành công")
     public ResponseEntity<Void> changePassword(
-            @jakarta.validation.Valid @RequestBody com.sapo.mock.clothing.user.dto.request.ChangePasswordRequest request) {
+            @Valid @RequestBody ChangePasswordRequest request) {
         String username = SecurityUtil.getCurrentUserLogin()
                 .orElseThrow(() -> new RuntimeException("Vui lòng đăng nhập"));
         
@@ -80,11 +85,11 @@ public class UserController {
     @PutMapping("/{id}/profile")
     @ApiMessage("Cập nhật thông tin nhân viên thành công")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
-    public ResponseEntity<com.sapo.mock.clothing.entity.User> updateUserProfileByAdmin(
-            @org.springframework.web.bind.annotation.PathVariable Integer id,
-            @jakarta.validation.Valid @RequestBody com.sapo.mock.clothing.user.dto.request.UpdateProfileRequest request) {
+    public ResponseEntity<User> updateUserProfileByAdmin(
+            @PathVariable Integer id,
+            @Valid @RequestBody UpdateProfileRequest request) {
         
-        com.sapo.mock.clothing.entity.User updatedUser = userService.updateUserProfileByAdmin(id, request);
+        User updatedUser = userService.updateUserProfileByAdmin(id, request);
         return ResponseEntity.ok(updatedUser);
     }
 }

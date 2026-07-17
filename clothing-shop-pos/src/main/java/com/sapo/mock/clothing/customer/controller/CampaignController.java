@@ -17,7 +17,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 import java.time.Instant;
+import com.sapo.mock.clothing.util.SecurityUtil;
 
 @RestController
 @RequestMapping("/api/crm/campaigns")
@@ -128,10 +130,10 @@ public class CampaignController {
     @PostMapping("/care-logs")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'MANAGE_CUSTOMER')")
     public ResponseEntity<RestResponse<Void>> createCareLog(
-            @jakarta.validation.Valid @RequestBody CareLogRequest request) {
+            @Valid @RequestBody CareLogRequest request) {
 
         // Lấy ID nhân viên từ Context của Spring Security
-        Integer currentUserId = com.sapo.mock.clothing.util.SecurityUtil.getCurrentUserId();
+        Integer currentUserId = SecurityUtil.getCurrentUserId();
         if (currentUserId == null) {
             currentUserId = 1; // Fallback an toàn nếu test API không có token
         }
@@ -156,7 +158,7 @@ public class CampaignController {
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'MANAGE_CUSTOMER')")
     public ResponseEntity<RestResponse<Void>> updateCareLog(
             @PathVariable Integer id,
-            @jakarta.validation.Valid @RequestBody CareLogRequest request) {
+            @Valid @RequestBody CareLogRequest request) {
 
         campaignService.updateCareLog(id, request);
 

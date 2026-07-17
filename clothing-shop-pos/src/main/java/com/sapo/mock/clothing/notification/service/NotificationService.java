@@ -21,6 +21,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 
 @Service
 @RequiredArgsConstructor
@@ -31,8 +33,8 @@ public class NotificationService {
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @org.springframework.beans.factory.annotation.Autowired
-    @org.springframework.context.annotation.Lazy
+    @Autowired
+    @Lazy
     private OrderService orderService;
 
     // Lưu các subscriber đang kết nối

@@ -12,6 +12,8 @@ import com.sapo.mock.clothing.util.constant.StockLogSource;
 
 import java.time.Instant;
 import java.util.List;
+import org.springframework.data.repository.query.Param;
+import com.sapo.mock.clothing.util.constant.StockLogReferenceType;
 
 @Repository
 public interface StockLogRepository extends JpaRepository<StockLog, Integer>,
@@ -26,12 +28,12 @@ public interface StockLogRepository extends JpaRepository<StockLog, Integer>,
     // Lấy tất cả log trong khoảng thời gian
     @Query("SELECT s FROM StockLog s WHERE s.createdAt BETWEEN :from AND :to ORDER BY s.createdAt DESC")
     Page<StockLog> findByDateRange(
-            @org.springframework.data.repository.query.Param("from") Instant from,
-            @org.springframework.data.repository.query.Param("to") Instant to,
+            @Param("from") Instant from,
+            @Param("to") Instant to,
             Pageable pageable);
 
     // Lấy log theo referenceId + type (ví dụ: tất cả log của 1 đơn hàng)
     List<StockLog> findByReferenceIdAndReferenceTypeOrderByCreatedAtDesc(
             Integer referenceId,
-            com.sapo.mock.clothing.util.constant.StockLogReferenceType referenceType);
+            StockLogReferenceType referenceType);
 }
