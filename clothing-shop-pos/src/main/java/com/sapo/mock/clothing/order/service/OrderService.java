@@ -361,6 +361,37 @@ public class OrderService {
         orderNotificationHelper.sendOrderNotifications(savedOrder, "QR_SEPAY");
     }
 
+    // Hoàn thành thanh toán đơn hàng bằng ID (sử dụng cho luồng POS thủ công/online tối giản)
+    @Transactional
+    public ResOrderDTO completeOrderPaymentById(Integer id, String paymentMethod, BigDecimal paidAmount) {
+        Order order = getOrderEntityById(id);
+        if (order.getStatus() != OrderStatus.PENDING) {
+            return mapToResOrderDTO(order, orderLineItemRepository.findByOrderId(id));
+        }
+
+        BigDecimal amount = paidAmount != null ? paidAmount : order.getTotalAmount();
+        if (amount.compareTo(order.getTotalAmount()) < 0) {
+            throw new BadRequestException("Số tiền thanh toán không đủ");
+        }
+
+        order.setStatus(OrderStatus.COMPLETED);
+        order.setPaidAmount(amount);
+        order.setChangeAmount(amount.subtract(order.getTotalAmount()));
+        order.setPointsEarned(order.getCustomerId() == 1 ? 0
+                : order.getTotalAmount().divideToIntegralValue(PointConstant.EARN_RATE).intValue());
+
+        Order savedOrder = orderRepository.save(order);
+        Customer customer = getCustomerById(savedOrder.getCustomerId());
+        CustomerVoucher appliedVoucher = orderLoyaltyService.getAppliedVoucher(savedOrder.getId());
+        
+        orderLoyaltyService.processLoyaltyOnCompletion(savedOrder, customer, appliedVoucher);
+        eventPublisher.publishEvent(new OrderCompletedEvent(savedOrder.getCustomerId(), savedOrder.getTotalAmount()));
+        
+        orderNotificationHelper.sendOrderNotifications(savedOrder, paymentMethod);
+
+        return mapToResOrderDTO(savedOrder, orderLineItemRepository.findByOrderId(savedOrder.getId()));
+    }
+
     // Mapping đơn hàng sang ResOrderDTO
     private ResOrderDTO mapToResOrderDTO(Order savedOrder, List<OrderLineItem> lineItems) {
         List<ResOrderDTO.ResOrderItemDTO> resItems = lineItems.stream()

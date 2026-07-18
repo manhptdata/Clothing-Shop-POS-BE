@@ -17,6 +17,9 @@ public class SystemSettingServiceImpl implements SystemSettingService {
 
     public static final String SETTING_REQUIRE_RETURN_APPROVAL = "REQUIRE_RETURN_APPROVAL";
     public static final String SETTING_REQUIRE_CANCEL_APPROVAL = "REQUIRE_CANCEL_APPROVAL";
+    public static final String SETTING_PAYMENT_BANK_NAME = "PAYMENT_BANK_NAME";
+    public static final String SETTING_PAYMENT_BANK_ACCOUNT = "PAYMENT_BANK_ACCOUNT";
+    public static final String SETTING_PAYMENT_ACCOUNT_NAME = "PAYMENT_ACCOUNT_NAME";
 
     @Override
     public List<SystemSetting> getAllSettings() {
@@ -37,6 +40,12 @@ public class SystemSettingServiceImpl implements SystemSettingService {
                 newSetting.setDescription("Yêu cầu duyệt trả hàng bằng mã PIN quản lý");
             } else if (SETTING_REQUIRE_CANCEL_APPROVAL.equals(key)) {
                 newSetting.setDescription("Yêu cầu duyệt hủy đơn hàng bằng mã PIN quản lý");
+            } else if (SETTING_PAYMENT_BANK_NAME.equals(key)) {
+                newSetting.setDescription("Mã ngân hàng thụ hưởng (ví dụ: MBBank, Vietcombank...)");
+            } else if (SETTING_PAYMENT_BANK_ACCOUNT.equals(key)) {
+                newSetting.setDescription("Số tài khoản ngân hàng thụ hưởng");
+            } else if (SETTING_PAYMENT_ACCOUNT_NAME.equals(key)) {
+                newSetting.setDescription("Tên chủ tài khoản ngân hàng thụ hưởng");
             }
             return newSetting;
         });
