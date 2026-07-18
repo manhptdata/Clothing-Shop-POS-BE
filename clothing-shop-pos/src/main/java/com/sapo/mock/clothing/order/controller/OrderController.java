@@ -81,4 +81,14 @@ public class OrderController {
         ResOrderDTO updatedOrder = orderService.updatePrintStatus(id, true);
         return ResponseEntity.ok(updatedOrder);
     }
+
+    @PostMapping("/{id}/complete-payment")
+    @ApiMessage("Xác nhận thanh toán đơn hàng thành công")
+    public ResponseEntity<ResOrderDTO> completePayment(
+            @PathVariable Integer id,
+            @RequestParam String paymentMethod,
+            @RequestParam(required = false) java.math.BigDecimal paidAmount) throws IdInvalidException {
+        ResOrderDTO completedOrder = orderService.completeOrderPaymentById(id, paymentMethod, paidAmount);
+        return ResponseEntity.ok(completedOrder);
+    }
 }

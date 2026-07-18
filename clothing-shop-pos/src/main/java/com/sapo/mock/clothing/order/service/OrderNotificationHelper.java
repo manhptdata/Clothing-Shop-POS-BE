@@ -4,6 +4,7 @@ import com.sapo.mock.clothing.entity.Notification;
 import com.sapo.mock.clothing.entity.Order;
 import com.sapo.mock.clothing.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -11,6 +12,7 @@ import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.Locale;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderNotificationHelper {
@@ -47,7 +49,7 @@ public class OrderNotificationHelper {
                     savedOrder.getOrderNumber()));
             notificationService.sendNotification(paidNotif);
         } catch (Exception e) {
-            System.err.println("Lỗi gửi thông báo đơn hàng mới: " + e.getMessage());
+            log.error("Lỗi gửi thông báo đơn hàng mới: {}", e.getMessage(), e);
         }
     }
 
@@ -69,7 +71,7 @@ public class OrderNotificationHelper {
                     order.getOrderNumber(), paidAmount.toString(), order.getTotalAmount().toString()));
             notificationService.sendNotification(failNotif);
         } catch (Exception e) {
-            System.err.println("Lỗi gửi thông báo thanh toán thiếu: " + e.getMessage());
+            log.error("Lỗi gửi thông báo thanh toán thiếu: {}", e.getMessage(), e);
         }
     }
 }

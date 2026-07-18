@@ -41,7 +41,7 @@ public class SecurityConfiguration {
         "/webjars/**",
         "/actuator/**",
         "/storage/**",
-        "/api/v1/payments/**"
+        "/api/v1/payments/sepay-webhook"
     };
 
 	@Bean
