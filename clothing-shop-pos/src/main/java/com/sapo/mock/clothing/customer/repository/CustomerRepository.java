@@ -73,10 +73,11 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer>, Jp
 
         // Tính tổng doanh số mua hàng thành công (COMPLETED) trong
         // vòng 12 tháng (365 ngày) qua
-        @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o " +
-                        "WHERE o.customerId = :customerId " +
-                        "AND o.status = com.sapo.mock.clothing.util.constant.OrderStatus.COMPLETED " +
-                        "AND o.createdAt >= :startDate")
+        @Query("SELECT COALESCE((SELECT SUM(o.totalAmount) FROM Order o WHERE o.customerId = :customerId " +
+                "AND o.status IN (com.sapo.mock.clothing.util.constant.OrderStatus.COMPLETED, com.sapo.mock.clothing.util.constant.OrderStatus.PARTIALLY_RETURNED) " +
+                "AND o.createdAt >= :startDate), 0) " +
+                "- COALESCE((SELECT SUM(ro.totalRefundAmount) FROM ReturnOrder ro WHERE ro.customerId = :customerId " +
+                "AND ro.createdAt >= :startDate), 0)")
         java.math.BigDecimal calculateSpendingInTimeRange(@Param("customerId") Integer customerId,
                         @Param("startDate") java.time.Instant startDate);
 

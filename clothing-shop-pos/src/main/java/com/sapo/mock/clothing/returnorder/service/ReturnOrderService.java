@@ -227,6 +227,51 @@ public class ReturnOrderService {
         if (computedRefundAmount.compareTo(remainingOrderPaidAmount) > 0) {
             computedRefundAmount = remainingOrderPaidAmount;
         }
+        
+        // RE-EVALUATE VOUCHER: Kiểm tra nếu giá trị đơn hàng còn lại không còn thỏa mãn Min Order Value của Voucher
+        BigDecimal newOrderValue = order.getTotalAmount().subtract(computedRefundAmount).subtract(previousRefundTotal);
+        if (order.getVoucherCode() != null && order.getDiscountFromVoucher() != null && order.getDiscountFromVoucher().compareTo(BigDecimal.ZERO) > 0) {
+            com.sapo.mock.clothing.entity.CustomerVoucher appliedVoucher = customerVoucherRepository.findByOrderId(order.getId()).orElse(null);
+            if (appliedVoucher != null && appliedVoucher.getVoucher().getMinOrderValue() != null) {
+                if (newOrderValue.compareTo(appliedVoucher.getVoucher().getMinOrderValue()) < 0) {
+                    // BƯỚC 1: Tính lại hoàn tiền theo giá gốc (chỉ áp dụng discount điểm, không có voucher)
+                    // Vì voucher đã bị bake-in vào discountRatio ban đầu, phải tính lại từ đầu
+                    BigDecimal discountFromPointsVal = order.getDiscountFromPoints() != null ? order.getDiscountFromPoints() : BigDecimal.ZERO;
+                    BigDecimal discountRatioPoints = discountFromPointsVal.compareTo(BigDecimal.ZERO) > 0 && originalSubtotal.compareTo(BigDecimal.ZERO) > 0
+                            ? discountFromPointsVal.divide(originalSubtotal, 6, RoundingMode.HALF_UP)
+                            : BigDecimal.ZERO;
+
+                    computedRefundAmount = BigDecimal.ZERO;
+                    for (ReturnOrderLineItem item : returnLineItems) {
+                        BigDecimal originalUnitPrice = originalItemsMap.get(item.getVariantId()).getUnitPrice();
+                        BigDecimal newRefundPrice = originalUnitPrice.multiply(BigDecimal.ONE.subtract(discountRatioPoints)).setScale(0, RoundingMode.HALF_UP);
+                        BigDecimal newSubtotal = newRefundPrice.multiply(BigDecimal.valueOf(item.getQuantity())).setScale(0, RoundingMode.HALF_UP);
+                        item.setRefundPrice(newRefundPrice);   // Cập nhật refundPrice cho đúng trên phiếu trả hàng
+                        item.setSubtotal(newSubtotal);
+                        computedRefundAmount = computedRefundAmount.add(newSubtotal);
+                    }
+                    // Thu hồi toàn bộ số tiền Voucher (khấu trừ vào số tiền hoàn)
+                    computedRefundAmount = computedRefundAmount.subtract(order.getDiscountFromVoucher());
+                    if (computedRefundAmount.compareTo(BigDecimal.ZERO) < 0) {
+                        computedRefundAmount = BigDecimal.ZERO;
+                    }
+                    // Ngắt kết nối voucher với đơn hàng để không bị trừ lặp lại
+                    order.setDiscountFromVoucher(BigDecimal.ZERO);
+                    order.setVoucherCode(null);
+                    
+                    // BƯỚC 2: Hoàn trả Voucher nguyên vẹn cho khách hàng
+                    if (appliedVoucher.getExpiredAt().isBefore(java.time.Instant.now())) {
+                        appliedVoucher.setStatus(com.sapo.mock.clothing.util.constant.CustomerVoucherStatusEnum.EXPIRED);
+                    } else {
+                        appliedVoucher.setStatus(com.sapo.mock.clothing.util.constant.CustomerVoucherStatusEnum.UNUSED);
+                    }
+                    appliedVoucher.setUsedAt(null);
+                    appliedVoucher.setOrderId(null);
+                    customerVoucherRepository.save(appliedVoucher);
+                }
+            }
+        }
+
         returnOrder.setTotalRefundAmount(computedRefundAmount);
 
         // Lưu đơn trả hàng
@@ -256,41 +301,29 @@ public class ReturnOrderService {
             Customer lockedCustomer = customerRepository.findByIdWithPessimisticLock(customer.getId())
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng ID: " + customer.getId()));
 
-            if (isAllReturned) {
-                // Trả hàng toàn bộ → hoàn chính xác điểm đã dùng + trừ chính xác điểm đã tích
-                if (order.getPointsUsed() > 0) {
-                    lockedCustomer.setRewardPoints(lockedCustomer.getRewardPoints() + order.getPointsUsed());
-                    PointHistory phRefund = new PointHistory();
-                    phRefund.setCustomerId(lockedCustomer.getId());
-                    phRefund.setOrderId(order.getId());
-                    phRefund.setPointsChange(order.getPointsUsed());
-                    phRefund.setType(PointConstant.TYPE_REFUND);
-                    phRefund.setDescription("Hoàn điểm đã dùng do khách trả hàng toàn bộ đơn " + order.getOrderNumber());
-                    pointHistoryRepository.save(phRefund);
-                }
-                if (order.getPointsEarned() > 0) {
-                    lockedCustomer.setRewardPoints(Math.max(0, lockedCustomer.getRewardPoints() - order.getPointsEarned()));
-                    PointHistory phDeduct = new PointHistory();
-                    phDeduct.setCustomerId(lockedCustomer.getId());
-                    phDeduct.setOrderId(order.getId());
-                    phDeduct.setPointsChange(-order.getPointsEarned());
-                    phDeduct.setType(PointConstant.TYPE_REFUND);
-                    phDeduct.setDescription("Trừ điểm tích lũy do khách trả hàng toàn bộ đơn " + order.getOrderNumber());
-                    pointHistoryRepository.save(phDeduct);
-                }
-            } else {
-                // Trả hàng một phần → chỉ khấu trừ điểm tích lũy tương ứng với giá trị hoàn tiền
-                int pointsToDeduct = computedRefundAmount.divideToIntegralValue(PointConstant.EARN_RATE).intValue();
-                if (pointsToDeduct > 0) {
-                    lockedCustomer.setRewardPoints(Math.max(0, lockedCustomer.getRewardPoints() - pointsToDeduct));
-                    PointHistory phDeduct = new PointHistory();
-                    phDeduct.setCustomerId(lockedCustomer.getId());
-                    phDeduct.setOrderId(order.getId());
-                    phDeduct.setPointsChange(-pointsToDeduct);
-                    phDeduct.setType(PointConstant.TYPE_REFUND);
-                    phDeduct.setDescription("Khấu trừ điểm tích lũy do khách trả hàng một phần đơn " + order.getOrderNumber());
-                    pointHistoryRepository.save(phDeduct);
-                }
+            // 1. Hoàn lại điểm đã sử dụng nếu trả hàng toàn bộ (giữ nguyên logic cũ)
+            if (isAllReturned && order.getPointsUsed() > 0) {
+                lockedCustomer.setRewardPoints(lockedCustomer.getRewardPoints() + order.getPointsUsed());
+                PointHistory phRefund = new PointHistory();
+                phRefund.setCustomerId(lockedCustomer.getId());
+                phRefund.setOrderId(order.getId());
+                phRefund.setPointsChange(order.getPointsUsed());
+                phRefund.setType(PointConstant.TYPE_REFUND);
+                phRefund.setDescription("Hoàn điểm đã dùng do khách trả hàng toàn bộ đơn " + order.getOrderNumber());
+                pointHistoryRepository.save(phRefund);
+            }
+
+            // 2. Đồng nhất công thức TRỪ điểm tích lũy cho cả trả 1 phần và trả toàn bộ
+            int pointsToDeduct = computedRefundAmount.divideToIntegralValue(PointConstant.EARN_RATE).intValue();
+            if (pointsToDeduct > 0) {
+                lockedCustomer.setRewardPoints(Math.max(0, lockedCustomer.getRewardPoints() - pointsToDeduct));
+                PointHistory phDeduct = new PointHistory();
+                phDeduct.setCustomerId(lockedCustomer.getId());
+                phDeduct.setOrderId(order.getId());
+                phDeduct.setPointsChange(-pointsToDeduct);
+                phDeduct.setType(PointConstant.TYPE_REFUND);
+                phDeduct.setDescription("Khấu trừ điểm tích lũy do khách trả hàng đơn " + order.getOrderNumber());
+                pointHistoryRepository.save(phDeduct);
             }
             customerRepository.save(lockedCustomer);
 
@@ -316,9 +349,6 @@ public class ReturnOrderService {
             order.setStatus(OrderStatus.PARTIALLY_RETURNED);
         }
         
-        // Trừ số tiền đã hoàn để OrderRepository tính doanh thu chính xác
-        order.setPaidAmount(order.getPaidAmount().subtract(computedRefundAmount));
-        order.setTotalAmount(order.getTotalAmount().subtract(computedRefundAmount));
         orderRepository.save(order);
 
         return mapToResReturnOrderDTO(savedReturnOrder, returnLineItems);

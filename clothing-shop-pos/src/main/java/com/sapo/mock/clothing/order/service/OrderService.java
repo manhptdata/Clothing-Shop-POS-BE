@@ -11,10 +11,14 @@ import com.sapo.mock.clothing.order.repository.OrderLineItemRepository;
 import com.sapo.mock.clothing.order.repository.OrderRepository;
 import com.sapo.mock.clothing.user.repository.UserRepository;
 import com.sapo.mock.clothing.util.constant.OrderStatus;
+import com.sapo.mock.clothing.util.constant.PaymentMethod;
 import com.sapo.mock.clothing.customer.repository.CustomerRepository;
 import com.sapo.mock.clothing.common.dto.response.ResultPaginationDTO;
 import com.sapo.mock.clothing.util.constant.PointConstant;
 import com.sapo.mock.clothing.setting.service.SystemSettingService;
+import com.sapo.mock.clothing.payment.repository.PaymentLogRepository;
+import com.sapo.mock.clothing.entity.PaymentLog;
+import com.sapo.mock.clothing.customer.repository.CustomerVoucherRepository;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -50,6 +54,8 @@ public class OrderService {
     private final OrderLoyaltyService orderLoyaltyService;
     private final OrderNotificationHelper orderNotificationHelper;
     private final SystemSettingService systemSettingService;
+    private final PaymentLogRepository paymentLogRepository;
+    private final CustomerVoucherRepository customerVoucherRepository;
 
     // Tạo đơn hàng mới
     @Transactional
@@ -88,8 +94,11 @@ public class OrderService {
         // Cập nhật lại referenceId trong StockLog sau khi có orderId thật
         // (ghi log 2 lần nếu muốn exact; đơn giản nhất là truyền orderId sau khi save)
 
-        if (order.getStatus() == OrderStatus.PENDING && appliedVoucher != null) {
-            orderLoyaltyService.reserveVoucher(appliedVoucher, savedOrder.getId());
+        if (order.getStatus() == OrderStatus.PENDING) {
+            if (appliedVoucher != null) {
+                orderLoyaltyService.reserveVoucher(appliedVoucher, savedOrder.getId());
+            }
+            orderLoyaltyService.reservePoints(savedOrder, customer);
         }
 
         if (order.getStatus() == OrderStatus.COMPLETED) {
@@ -107,6 +116,11 @@ public class OrderService {
         Order order = getOrderEntityById(id);
         List<OrderLineItem> items = orderLineItemRepository.findByOrderId(id);
         return mapToResOrderDTO(order, items);
+    }
+
+    public Order getOrderEntityByOrderNumber(String orderNumber) {
+        return orderRepository.findByOrderNumber(orderNumber)
+                .orElseThrow(() -> new com.sapo.mock.clothing.exception.ResourceNotFoundException("Đơn hàng không tồn tại: " + orderNumber));
     }
 
     // Lấy danh sách đơn hàng
@@ -270,6 +284,7 @@ public class OrderService {
         order.setNote(dto.getNote());
         order.setPaidAmount(dto.getPaidAmount() != null ? dto.getPaidAmount() : BigDecimal.ZERO);
         order.setStatus(dto.getStatus() != null ? dto.getStatus() : OrderStatus.COMPLETED);
+        order.setPaymentMethod(dto.getPaymentMethod() != null ? PaymentMethod.valueOf(dto.getPaymentMethod()) : PaymentMethod.CASH);
         if (order.getId() == null)
             order.setPrinted(false);
     }
@@ -346,6 +361,7 @@ public class OrderService {
         }
 
         order.setStatus(OrderStatus.COMPLETED);
+        order.setPaymentMethod(PaymentMethod.QR_SEPAY);
         order.setPaidAmount(paidAmount);
         order.setChangeAmount(paidAmount.subtract(order.getTotalAmount()));
         order.setPointsEarned(order.getCustomerId() == 1 ? 0
@@ -364,7 +380,8 @@ public class OrderService {
     // Hoàn thành thanh toán đơn hàng bằng ID (sử dụng cho luồng POS thủ công/online tối giản)
     @Transactional
     public ResOrderDTO completeOrderPaymentById(Integer id, String paymentMethod, BigDecimal paidAmount) {
-        Order order = getOrderEntityById(id);
+        Order order = orderRepository.findByIdWithPessimisticLock(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Đơn hàng ID " + id + " không tồn tại"));
         if (order.getStatus() != OrderStatus.PENDING) {
             return mapToResOrderDTO(order, orderLineItemRepository.findByOrderId(id));
         }
@@ -375,6 +392,7 @@ public class OrderService {
         }
 
         order.setStatus(OrderStatus.COMPLETED);
+        order.setPaymentMethod(paymentMethod != null ? PaymentMethod.valueOf(paymentMethod) : PaymentMethod.CASH);
         order.setPaidAmount(amount);
         order.setChangeAmount(amount.subtract(order.getTotalAmount()));
         order.setPointsEarned(order.getCustomerId() == 1 ? 0
@@ -387,9 +405,28 @@ public class OrderService {
         orderLoyaltyService.processLoyaltyOnCompletion(savedOrder, customer, appliedVoucher);
         eventPublisher.publishEvent(new OrderCompletedEvent(savedOrder.getCustomerId(), savedOrder.getTotalAmount()));
         
+        if ("QR_SEPAY".equals(paymentMethod)) {
+            PaymentLog paymentLog = new PaymentLog();
+            paymentLog.setReferenceCode("MANUAL_" + System.currentTimeMillis());
+            paymentLog.setOrderNumber(savedOrder.getOrderNumber());
+            paymentLog.setTransferAmount(amount);
+            paymentLog.setGateway("MANUAL");
+            paymentLog.setTransactionDate(java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            paymentLog.setContent("Thanh toán QR được xác nhận thủ công cho đơn " + savedOrder.getOrderNumber());
+            paymentLog.setStatus("SUCCESS");
+            paymentLogRepository.save(paymentLog);
+        }
+
         orderNotificationHelper.sendOrderNotifications(savedOrder, paymentMethod);
 
         return mapToResOrderDTO(savedOrder, orderLineItemRepository.findByOrderId(savedOrder.getId()));
+    }
+
+    private BigDecimal getVoucherMinOrderValue(Order order) {
+        if (order.getVoucherCode() == null) return null;
+        return customerVoucherRepository.findByOrderIdWithVoucher(order.getId())
+                .map(cv -> cv.getVoucher() != null ? cv.getVoucher().getMinOrderValue() : null)
+                .orElse(null);
     }
 
     // Mapping đơn hàng sang ResOrderDTO
@@ -421,7 +458,9 @@ public class OrderService {
                 .discountFromPoints(savedOrder.getDiscountFromPoints())
                 .voucherCode(savedOrder.getVoucherCode())
                 .discountFromVoucher(savedOrder.getDiscountFromVoucher())
+                .voucherMinOrderValue(getVoucherMinOrderValue(savedOrder))
                 .status(savedOrder.getStatus())
+                .paymentMethod(savedOrder.getPaymentMethod())
                 .isPrinted(savedOrder.isPrinted())
                 .note(savedOrder.getNote())
                 .createdAt(savedOrder.getCreatedAt())

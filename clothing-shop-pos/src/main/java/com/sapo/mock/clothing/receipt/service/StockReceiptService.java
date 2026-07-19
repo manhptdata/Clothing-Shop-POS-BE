@@ -180,7 +180,7 @@ public class StockReceiptService implements IStockReceiptService {
 	@Override
 	@Transactional
 	public StockReceiptResponse confirmReceipt(Integer receiptId, Integer userId) {
-		StockReceipt receipt = receiptRepository.findById(receiptId)
+		StockReceipt receipt = receiptRepository.findByIdWithPessimisticLock(receiptId)
 				.orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu nhập"));
 
 		// SỬA LỖI ENUM: Dùng ReceiptStatus thay vì String
@@ -264,7 +264,7 @@ public class StockReceiptService implements IStockReceiptService {
 	@Override
 	@Transactional
 	public StockReceiptResponse cancelReceipt(Integer receiptId, Integer userId) {
-		StockReceipt receipt = receiptRepository.findById(receiptId)
+		StockReceipt receipt = receiptRepository.findByIdWithPessimisticLock(receiptId)
 				.orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu nhập"));
 
 		if (receipt.getStatus() == ReceiptStatus.CANCELLED) {
@@ -280,6 +280,10 @@ public class StockReceiptService implements IStockReceiptService {
 				int oldQuantity = variant.getQuantity() != null ? variant.getQuantity() : 0;
 				int newQuantity = oldQuantity - item.getQuantity();
 
+				if (newQuantity < 0) {
+					throw new BadRequestException("Không thể hủy phiếu nhập: Tồn kho của sản phẩm '" + variant.getSku() + "' không đủ để trừ (còn " + oldQuantity + ", cần trừ " + item.getQuantity() + ").");
+				}
+
 				// Tính toán rollback giá vốn bình quân gia quyền di động (MAC)
 				BigDecimal currentImportPrice = variant.getImportPrice() != null ? variant.getImportPrice() : BigDecimal.ZERO;
 				BigDecimal itemImportPrice = item.getImportPrice() != null ? item.getImportPrice() : BigDecimal.ZERO;
@@ -290,8 +294,10 @@ public class StockReceiptService implements IStockReceiptService {
 					BigDecimal totalItemValue = itemImportPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
 					BigDecimal remainingValue = totalCurrentValue.subtract(totalItemValue);
 					BigDecimal remainingQty = BigDecimal.valueOf(newQuantity);
-					if (remainingValue.compareTo(BigDecimal.ZERO) < 0) {
-						newImportPrice = BigDecimal.ZERO;
+					if (remainingValue.compareTo(BigDecimal.ZERO) < 0 || remainingQty.compareTo(BigDecimal.ZERO) <= 0) {
+						// BẢO VỆ KHO: Nếu phép tính lùi MAC cho ra số tiền âm (hoặc chia cho 0) do đã phát sinh doanh số.
+						// Ta giữ nguyên giá trị MAC hiện tại để kho không bị sập giá vốn.
+						newImportPrice = currentImportPrice;
 					} else {
 						newImportPrice = remainingValue.divide(remainingQty, 2, RoundingMode.HALF_UP);
 					}

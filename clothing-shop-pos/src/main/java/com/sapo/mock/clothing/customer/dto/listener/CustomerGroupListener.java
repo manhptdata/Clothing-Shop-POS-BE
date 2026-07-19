@@ -32,8 +32,8 @@ public class CustomerGroupListener {
     public void handleOrderCompletedEvent(OrderCompletedEvent event) {
         if (event.getCustomerId() == null || event.getCustomerId() == 1 || event.getOrderAmount() == null) return;
 
-        // 1. Tìm thông tin khách hàng từ DB
-        Customer customer = customerRepository.findById(event.getCustomerId())
+        // 1. Tìm thông tin khách hàng từ DB (Dùng Pessimistic Lock để chống Lost Update khi cộng tiền)
+        Customer customer = customerRepository.findByIdWithPessimisticLock(event.getCustomerId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy khách hàng khi xử lý nâng hạng tự động"));
 
         // 2. Cộng dồn doanh số mua hàng mới
@@ -48,7 +48,9 @@ public class CustomerGroupListener {
         );
 
         // Bốc ra phần tử đầu tiên tìm được (Hạng cao nhất thỏa mãn nhờ lệnh ORDER BY ở Repo), nếu List rỗng thì trả về null
-        CustomerGroup suitableGroup = suitableGroups.isEmpty() ? null : suitableGroups.get(0);
+        CustomerGroup suitableGroup = suitableGroups.isEmpty() ? 
+                customerGroupRepository.findFirstByStatusOrderByMinSpendingAsc(CustomerStatusEnum.ACTIVE).orElse(null) 
+                : suitableGroups.get(0);
 
         // 4. Cập nhật nhóm mới tự động
         customer.setCustomerGroup(suitableGroup);

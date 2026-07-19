@@ -26,13 +26,17 @@ public interface CustomerVoucherRepository extends JpaRepository<CustomerVoucher
     List<CustomerVoucher> findByCustomerIdOrderByReceivedAtDesc(Integer customerId);
 
     // Tìm voucher chưa sử dụng và CÒN HẠN của khách hàng theo mã code
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT cv FROM CustomerVoucher cv JOIN cv.voucher v WHERE cv.customer.id = :customerId AND v.code = :voucherCode AND cv.status = 'UNUSED' AND cv.expiredAt > CURRENT_TIMESTAMP")
-    Optional<CustomerVoucher> findUnusedVoucherByCustomerAndCode(
+    Optional<CustomerVoucher> findUnusedVoucherByCustomerAndCodeForUpdate(
             @Param("customerId") Integer customerId,
             @Param("voucherCode") String voucherCode);
 
     // Tìm voucher đã được áp dụng cho một đơn hàng cụ thể
     Optional<CustomerVoucher> findByOrderId(Integer orderId);
+
+    @Query("SELECT cv FROM CustomerVoucher cv JOIN FETCH cv.voucher v WHERE cv.orderId = :orderId")
+    Optional<CustomerVoucher> findByOrderIdWithVoucher(@Param("orderId") Integer orderId);
 
     @Query("SELECT new com.sapo.mock.clothing.customer.dto.response.CustomerVoucherHistoryResponse(" +
            "cv.id, c.id, c.fullName, c.phone, v.name, v.code, cv.receivedAt, cv.expiredAt, cv.usedAt, cast(cv.status as string)) " +
@@ -47,4 +51,7 @@ public interface CustomerVoucherRepository extends JpaRepository<CustomerVoucher
     Page<CustomerVoucherHistoryResponse> searchHistory(
             @Param("keyword") String keyword,
             Pageable pageable);
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT cv FROM CustomerVoucher cv WHERE cv.id = :id")
+    Optional<CustomerVoucher> findByIdWithPessimisticLock(@Param("id") Integer id);
 }

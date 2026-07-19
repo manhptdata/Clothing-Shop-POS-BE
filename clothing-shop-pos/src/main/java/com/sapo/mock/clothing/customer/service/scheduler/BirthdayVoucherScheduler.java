@@ -53,8 +53,8 @@ public class BirthdayVoucherScheduler {
         LocalDate today = LocalDate.now();
         int currentMonth = today.getMonthValue();
 
-        // Mốc đầu tháng hiện tại để check trùng luồng Hạng Bạc
-        Instant startOfMonth = today.with(TemporalAdjusters.firstDayOfMonth())
+        // Mốc đầu năm hiện tại để ngăn khách đổi ngày sinh nhiều lần trong năm
+        Instant startOfYear = today.with(TemporalAdjusters.firstDayOfYear())
                 .atStartOfDay(ZoneId.systemDefault())
                 .toInstant();
 
@@ -79,8 +79,8 @@ public class BirthdayVoucherScheduler {
                 continue;
             }
 
-            // Phát voucher (tự kiểm tra trùng lặp trong tháng)
-            issueVoucherIfNotExist(customer, voucher, startOfMonth, getEndOfMonthInstant(today));
+            // Phát voucher (tự kiểm tra trùng lặp trong năm nay)
+            issueVoucherIfNotExist(customer, voucher, startOfYear, getEndOfMonthInstant(today));
         }
         log.info(">>> [CRM VOUCHER] Kết thúc tiến trình tự động quét phát hành Voucher an toàn.");
     }
