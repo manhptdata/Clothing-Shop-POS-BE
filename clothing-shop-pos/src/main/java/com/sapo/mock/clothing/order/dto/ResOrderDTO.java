@@ -1,6 +1,7 @@
 package com.sapo.mock.clothing.order.dto;
 
 import com.sapo.mock.clothing.util.constant.OrderStatus;
+import com.sapo.mock.clothing.util.constant.PaymentMethod;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
@@ -36,6 +37,7 @@ public class ResOrderDTO {
     private BigDecimal discountFromVoucher;
 
     private OrderStatus status;
+    private PaymentMethod paymentMethod;
     private boolean isPrinted;
     private String note;
 

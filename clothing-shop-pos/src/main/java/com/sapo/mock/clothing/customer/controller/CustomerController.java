@@ -16,6 +16,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import com.sapo.mock.clothing.entity.PointHistory;
+import com.sapo.mock.clothing.customer.repository.PointHistoryRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -31,9 +33,27 @@ public class CustomerController {
 
     @Autowired
     private CustomerService customerService;
-
+    @Autowired
+    private PointHistoryRepository pointHistoryRepository;
 
     private final CustomerFileService customerFileService;
+
+    @GetMapping("/{customerId}/point-history")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'VIEW_CUSTOMER')")
+    public ResponseEntity<RestResponse<Page<PointHistory>>> getPointHistory(
+            @PathVariable Integer customerId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Page<PointHistory> result = pointHistoryRepository.findByCustomerIdOrderByCreatedAtDesc(
+                customerId, 
+                PageRequest.of(page > 0 ? page - 1 : 0, size)
+        );
+        RestResponse<Page<PointHistory>> response = new RestResponse<>();
+        response.setStatusCode(200);
+        response.setMessage("Tải lịch sử điểm thưởng thành công");
+        response.setData(result);
+        return ResponseEntity.ok(response);
+    }
 
     /**
      * Customer lookup API using the shared RestResponse format.

@@ -43,6 +43,13 @@ public class OrderController {
         return ResponseEntity.ok(order);
     }
 
+    @GetMapping("/by-number/{orderNumber}")
+    @ApiMessage("Lấy ID đơn hàng qua mã")
+    public ResponseEntity<Integer> getOrderIdByNumber(@PathVariable String orderNumber) {
+        com.sapo.mock.clothing.entity.Order order = orderService.getOrderEntityByOrderNumber(orderNumber);
+        return ResponseEntity.ok(order.getId());
+    }
+
     @GetMapping
     @ApiMessage("Lấy danh sách đơn hàng thành công")
     public ResponseEntity<ResultPaginationDTO> getAllOrders(

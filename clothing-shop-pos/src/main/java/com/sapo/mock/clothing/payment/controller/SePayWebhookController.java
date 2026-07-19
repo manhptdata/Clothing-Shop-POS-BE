@@ -29,7 +29,7 @@ public class SePayWebhookController {
 
     private final OrderService orderService;
     private final PaymentLogRepository paymentLogRepository;
-    private static final Pattern ORDER_NUMBER_PATTERN = Pattern.compile("HD-?\\d{8}-?\\d{3,}");
+    private static final Pattern ORDER_NUMBER_PATTERN = Pattern.compile("\\bHD-?\\d{8}-?\\d{3,}\\b");
 
     @Value("${sepay.webhook.token}")
     private String webhookToken;
@@ -63,10 +63,20 @@ public class SePayWebhookController {
         // Chuyển khoản tiền vào
         if ("in".equalsIgnoreCase(request.getTransferType())) {
             
-            // Check idempotency
-            if (request.getReferenceCode() != null && paymentLogRepository.existsByReferenceCode(request.getReferenceCode())) {
-                log.info("Webhook trùng lặp (referenceCode={}), bỏ qua.", request.getReferenceCode());
-                return ResponseEntity.ok(Map.of("success", true));
+            // 1. Ghi PaymentLog PROCESSING trước (atomic check)
+            if (request.getReferenceCode() != null) {
+                java.util.Optional<PaymentLog> existingLog = paymentLogRepository.findByReferenceCode(request.getReferenceCode());
+                if (existingLog.isPresent()) {
+                    String existingStatus = existingLog.get().getStatus();
+                    if ("SUCCESS".equals(existingStatus) || "PROCESSING".equals(existingStatus) || "INSUFFICIENT".equals(existingStatus)) {
+                        log.info("Webhook trùng lặp (referenceCode={}, status={}), bỏ qua.", request.getReferenceCode(), existingStatus);
+                        return ResponseEntity.ok(Map.of("success", true));
+                    }
+                    // Status = ERROR hoặc NO_ORDER -> cho phép xử lý lại
+                    paymentLogRepository.updateByReferenceCode(request.getReferenceCode(), "PROCESSING", null);
+                } else {
+                    savePaymentLog(request, null, "PROCESSING");
+                }
             }
 
             String content = request.getContent() != null ? request.getContent() : "";
@@ -74,33 +84,37 @@ public class SePayWebhookController {
 
             if (matcher.find()) {
                 String matchedStr = matcher.group();
-                String orderNumber = matchedStr;
+                String orderNumber;
 
-                // Nếu nội dung bị ngân hàng lọc bỏ dấu gạch ngang
-                if (!matchedStr.contains("-") && matchedStr.length() >= 13) {
-                    String datePart = matchedStr.substring(2, 10);
-                    String seqPart = matchedStr.substring(10);
+                // Normalize: bỏ hết dấu gạch ngang -> rebuild chuẩn
+                String normalized = matchedStr.replace("-", "");
+                // normalized = "HD" + 8 số ngày + N số sequence
+                if (normalized.length() >= 13) {
+                    String datePart = normalized.substring(2, 10);
+                    String seqPart = normalized.substring(10);
                     orderNumber = "HD-" + datePart + "-" + seqPart;
+                } else {
+                    orderNumber = matchedStr; // không đủ dài -> giữ nguyên
                 }
 
                 try {
                     orderService.completeOrderPayment(orderNumber, request.getTransferAmount());
                     log.info("Thanh toán thành công cho đơn hàng: {}", orderNumber);
-                    savePaymentLog(request, orderNumber, "SUCCESS");
+                    paymentLogRepository.updateByReferenceCode(request.getReferenceCode(), "SUCCESS", orderNumber);
                 } catch (BadRequestException e) {
                     // Lỗi nghiệp vụ (chuyển thiếu tiền, đơn không pending)
                     log.warn("Lỗi nghiệp vụ xử lý thanh toán đơn hàng {}: {}", orderNumber, e.getMessage());
-                    savePaymentLog(request, orderNumber, "INSUFFICIENT");
+                    paymentLogRepository.updateByReferenceCode(request.getReferenceCode(), "INSUFFICIENT", orderNumber);
                 } catch (Exception e) {
                     // Lỗi hệ thống (DB lỗi, timeout) -> Trả 500 để SePay retry
                     log.error("Lỗi hệ thống xử lý thanh toán đơn hàng {}: {}", orderNumber, e.getMessage(), e);
-                    savePaymentLog(request, orderNumber, "ERROR");
+                    paymentLogRepository.updateByReferenceCode(request.getReferenceCode(), "ERROR", orderNumber);
                     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                             .body(Map.of("success", false));
                 }
             } else {
                 log.info("Không tìm thấy mã đơn hàng trong nội dung chuyển khoản.");
-                savePaymentLog(request, null, "NO_ORDER");
+                paymentLogRepository.updateByReferenceCode(request.getReferenceCode(), "NO_ORDER", null);
             }
         }
 

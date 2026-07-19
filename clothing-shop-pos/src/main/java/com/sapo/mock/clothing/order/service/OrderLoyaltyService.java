@@ -65,7 +65,7 @@ public class OrderLoyaltyService {
     }
 
     public void applyPoints(ReqCreateOrderDTO dto, Order order, Customer customer, BigDecimal currentTotal) {
-        if (dto.getPointsToUse() == null || dto.getPointsToUse() <= 0) {
+        if (dto.getPointsToUse() == null || dto.getPointsToUse() <= 0 || customer.getId() == 1) {
             order.setPointsUsed(0);
             order.setDiscountFromPoints(BigDecimal.ZERO);
             return;
@@ -77,16 +77,23 @@ public class OrderLoyaltyService {
 
         BigDecimal discount = BigDecimal.valueOf(dto.getPointsToUse()).multiply(PointConstant.REDEEM_RATE)
                 .min(currentTotal);
-        order.setPointsUsed(dto.getPointsToUse());
+        // Tính lại số điểm thực tế bị trừ dựa trên số tiền giảm giá thực tế (chống nuốt điểm)
+        int actualPointsUsed = discount.divideToIntegralValue(PointConstant.REDEEM_RATE).intValue();
+        order.setPointsUsed(actualPointsUsed);
         order.setDiscountFromPoints(discount);
     }
 
-    public void processLoyaltyOnCompletion(Order savedOrder, Customer customerParam, CustomerVoucher appliedVoucher) {
-        if (appliedVoucher != null) {
-            appliedVoucher.setStatus(CustomerVoucherStatusEnum.USED);
-            appliedVoucher.setUsedAt(Instant.now());
-            appliedVoucher.setOrderId(savedOrder.getId());
-            customerVoucherRepository.save(appliedVoucher);
+    public void processLoyaltyOnCompletion(Order savedOrder, Customer customerParam, CustomerVoucher appliedVoucherParam) {
+        if (appliedVoucherParam != null) {
+            CustomerVoucher lockedVoucher = customerVoucherRepository.findByIdWithPessimisticLock(appliedVoucherParam.getId())
+                    .orElseThrow(() -> new BadRequestException("Voucher không tồn tại"));
+            if (lockedVoucher.getStatus() == CustomerVoucherStatusEnum.USED) {
+                throw new BadRequestException("Voucher này đã được sử dụng cho đơn hàng khác.");
+            }
+            lockedVoucher.setStatus(CustomerVoucherStatusEnum.USED);
+            lockedVoucher.setUsedAt(Instant.now());
+            lockedVoucher.setOrderId(savedOrder.getId());
+            customerVoucherRepository.save(lockedVoucher);
         }
 
         if (customerParam.getId() != 1) {
@@ -96,7 +103,11 @@ public class OrderLoyaltyService {
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng ID: " + customerParam.getId()));
 
             if (savedOrder.getPointsUsed() > 0) {
-                customer.setRewardPoints(customer.getRewardPoints() - savedOrder.getPointsUsed());
+                int newPoints = customer.getRewardPoints() - savedOrder.getPointsUsed();
+                if (newPoints < 0) {
+                    throw new BadRequestException("Khách hàng không đủ điểm tích lũy (Cần " + savedOrder.getPointsUsed() + " điểm, hiện có " + customer.getRewardPoints() + " điểm).");
+                }
+                customer.setRewardPoints(newPoints);
                 savePointHistory(customer.getId(), savedOrder.getId(), -savedOrder.getPointsUsed(),
                         PointConstant.TYPE_REDEEM, "Sử dụng điểm cho đơn hàng " + savedOrder.getOrderNumber());
             }

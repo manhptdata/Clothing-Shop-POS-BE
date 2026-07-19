@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.List;
 
 import com.sapo.mock.clothing.util.constant.OrderStatus;
+import com.sapo.mock.clothing.util.constant.PaymentMethod;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -78,6 +79,10 @@ public class Order {
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
 	private OrderStatus status = OrderStatus.COMPLETED;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "payment_method", length = 20)
+	private PaymentMethod paymentMethod;
 
 	@Column(name = "is_printed", nullable = false)
 	private boolean isPrinted = false;

@@ -3,6 +3,8 @@ package com.sapo.mock.clothing.payment.controller;
 import com.sapo.mock.clothing.entity.Order;
 import com.sapo.mock.clothing.entity.SystemSetting;
 import com.sapo.mock.clothing.exception.ResourceNotFoundException;
+import com.sapo.mock.clothing.exception.BadRequestException;
+import com.sapo.mock.clothing.util.constant.OrderStatus;
 import com.sapo.mock.clothing.order.repository.OrderRepository;
 import com.sapo.mock.clothing.setting.service.SystemSettingService;
 import com.sapo.mock.clothing.setting.service.impl.SystemSettingServiceImpl;
@@ -19,6 +21,13 @@ import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.sapo.mock.clothing.payment.repository.PaymentLogRepository;
+import com.sapo.mock.clothing.entity.PaymentLog;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import com.sapo.mock.clothing.common.dto.response.RestResponse;
+
 @RestController
 @RequestMapping("/api/v1/payments")
 @RequiredArgsConstructor
@@ -26,6 +35,31 @@ public class PaymentController {
 
     private final SystemSettingService systemSettingService;
     private final OrderRepository orderRepository;
+    private final PaymentLogRepository paymentLogRepository;
+
+    @GetMapping("/logs")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'VIEW_ORDER')")
+    public ResponseEntity<RestResponse<Page<PaymentLog>>> getPaymentLogs(
+            @RequestParam(required = false) String orderNumber,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        
+        org.springframework.data.jpa.domain.Specification<PaymentLog> spec = 
+            com.sapo.mock.clothing.specification.PaymentLogSpecification.filterLogs(orderNumber, status, startDate, endDate);
+
+        Page<PaymentLog> result = paymentLogRepository.findAll(
+            spec,
+            PageRequest.of(page > 0 ? page - 1 : 0, size, Sort.by("createdAt").descending())
+        );
+        RestResponse<Page<PaymentLog>> response = new RestResponse<>();
+        response.setStatusCode(200);
+        response.setMessage("Lấy lịch sử thanh toán thành công");
+        response.setData(result);
+        return ResponseEntity.ok(response);
+    }
 
     @GetMapping("/qr-code")
     @ApiMessage("Lấy thông tin mã QR thanh toán thành công")
@@ -35,6 +69,11 @@ public class PaymentController {
 
         Order order = orderRepository.findByOrderNumber(orderNumber)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng: " + orderNumber));
+        
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new BadRequestException("Đơn hàng không ở trạng thái chờ thanh toán");
+        }
+
         BigDecimal amount = order.getTotalAmount();
 
         SystemSetting bankNameSetting = systemSettingService.getSettingByKey(SystemSettingServiceImpl.SETTING_PAYMENT_BANK_NAME);

@@ -17,4 +17,7 @@ public interface StockReceiptRepository extends JpaRepository<StockReceipt, Inte
 
 	boolean existsBySupplierId(Integer supplierId);
 
+	@org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+	@org.springframework.data.jpa.repository.Query("SELECT sr FROM StockReceipt sr WHERE sr.id = :id")
+	java.util.Optional<StockReceipt> findByIdWithPessimisticLock(@org.springframework.data.repository.query.Param("id") Integer id);
 }

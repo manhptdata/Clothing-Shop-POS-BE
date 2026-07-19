@@ -47,4 +47,7 @@ public interface CustomerVoucherRepository extends JpaRepository<CustomerVoucher
     Page<CustomerVoucherHistoryResponse> searchHistory(
             @Param("keyword") String keyword,
             Pageable pageable);
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT cv FROM CustomerVoucher cv WHERE cv.id = :id")
+    Optional<CustomerVoucher> findByIdWithPessimisticLock(@Param("id") Integer id);
 }

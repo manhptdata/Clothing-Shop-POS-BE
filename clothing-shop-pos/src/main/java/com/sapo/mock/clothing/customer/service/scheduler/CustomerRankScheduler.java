@@ -92,9 +92,13 @@ public class CustomerRankScheduler {
                     log.warn(">> [CRM DOWNGRADE ALERT]: Khách hàng [{}] bị HẠ HẠNG! Chi tiêu 12 tháng qua: {}đ. Từ hạng [{}] xuống hạng [{}]",
                             customer.getFullName(), spendingInLastYear, currentRank, targetRank);
 
-                    // Cập nhật nhóm mới và lưu lại
-                    customer.setCustomerGroup(matchedGroup);
-                    customerRepository.save(customer);
+                    // Re-fetch với Pessimistic Lock trước khi cập nhật để tránh Lost Update
+                    Customer lockedCustomer = customerRepository.findByIdWithPessimisticLock(customer.getId()).orElse(null);
+                    if (lockedCustomer != null) {
+                        // Cập nhật nhóm mới và lưu lại
+                        lockedCustomer.setCustomerGroup(matchedGroup);
+                        customerRepository.save(lockedCustomer);
+                    }
                 } else {
                     log.info(">> [CRM RANK MAINTENANCE]: Khách hàng [{}] giữ vững hạng [{}]. Chi tiêu 12 tháng qua: {}đ",
                             customer.getFullName(), currentRank, spendingInLastYear);

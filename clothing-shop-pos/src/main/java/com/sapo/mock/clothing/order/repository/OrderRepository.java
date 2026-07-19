@@ -31,11 +31,20 @@ public interface OrderRepository extends JpaRepository<Order, Integer>, JpaSpeci
     @Query("SELECT o FROM Order o WHERE o.id = :id")
     Optional<Order> findByIdWithPessimisticLock(@Param("id") Integer id);
 
-    @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.status IN (com.sapo.mock.clothing.util.constant.OrderStatus.COMPLETED, com.sapo.mock.clothing.util.constant.OrderStatus.PARTIALLY_RETURNED) AND o.createdByUsername = :username AND o.createdAt >= :start")
+    @Query("SELECT COALESCE(SUM(o.totalAmount), 0) - " +
+           "(SELECT COALESCE(SUM(ro.totalRefundAmount), 0) FROM ReturnOrder ro WHERE ro.createdByUsername = :username AND ro.createdAt >= :start) " +
+           "FROM Order o " +
+           "WHERE o.status IN (com.sapo.mock.clothing.util.constant.OrderStatus.COMPLETED, com.sapo.mock.clothing.util.constant.OrderStatus.PARTIALLY_RETURNED) " +
+           "AND o.paymentMethod = com.sapo.mock.clothing.util.constant.PaymentMethod.CASH " +
+           "AND o.createdByUsername = :username AND o.createdAt >= :start")
     BigDecimal calculateUserRevenueToday(@Param("username") String username,
             @Param("start") Instant start);
 
-    @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.status IN (com.sapo.mock.clothing.util.constant.OrderStatus.COMPLETED, com.sapo.mock.clothing.util.constant.OrderStatus.PARTIALLY_RETURNED) AND o.createdAt BETWEEN :start AND :end")
+    @Query("SELECT COALESCE(SUM(o.totalAmount), 0) - " +
+           "(SELECT COALESCE(SUM(ro.totalRefundAmount), 0) FROM ReturnOrder ro WHERE ro.createdAt BETWEEN :start AND :end) " +
+           "FROM Order o " +
+           "WHERE o.status IN (com.sapo.mock.clothing.util.constant.OrderStatus.COMPLETED, com.sapo.mock.clothing.util.constant.OrderStatus.PARTIALLY_RETURNED) " +
+           "AND o.createdAt BETWEEN :start AND :end")
     BigDecimal calculateRevenueBetween(@Param("start") Instant start,
             @Param("end") Instant end);
 

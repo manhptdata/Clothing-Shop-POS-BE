@@ -72,6 +72,7 @@ public interface CustomerGroupRepository extends JpaRepository<CustomerGroup, In
     // Lấy tất cả các hạng thành viên đang hoạt động (Đồng, Bạc, Vàng) để đối chiếu
     List<CustomerGroup> findByStatus(CustomerStatusEnum status);
 
-
+    // Lấy hạng thành viên thấp nhất làm hạng mặc định
+    Optional<CustomerGroup> findFirstByStatusOrderByMinSpendingAsc(CustomerStatusEnum status);
 
 }
