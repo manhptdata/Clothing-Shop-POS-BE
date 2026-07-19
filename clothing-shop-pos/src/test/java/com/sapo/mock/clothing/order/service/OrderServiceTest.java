@@ -349,7 +349,7 @@ public class OrderServiceTest {
         when(customerRepository.findById(2)).thenReturn(Optional.of(mockCustomer));
         when(productVariantRepository.findById(10)).thenReturn(Optional.of(mockVariant));
         when(orderRepository.countByCreatedAtAfter(any())).thenReturn(0L);
-        when(customerVoucherRepository.findUnusedVoucherByCustomerAndCode(2, "GIAM50K"))
+        when(customerVoucherRepository.findUnusedVoucherByCustomerAndCodeForUpdate(2, "GIAM50K"))
                 .thenReturn(Optional.of(mockCustomerVoucher));
 
         Order savedOrder = new Order();
