@@ -234,7 +234,23 @@ public class ReturnOrderService {
             com.sapo.mock.clothing.entity.CustomerVoucher appliedVoucher = customerVoucherRepository.findByOrderId(order.getId()).orElse(null);
             if (appliedVoucher != null && appliedVoucher.getVoucher().getMinOrderValue() != null) {
                 if (newOrderValue.compareTo(appliedVoucher.getVoucher().getMinOrderValue()) < 0) {
-                    // BƯỚC 1: Thu hồi tiền Voucher bằng cách cấn trừ vào tiền hoàn trả
+                    // BƯỚC 1: Tính lại hoàn tiền theo giá gốc (chỉ áp dụng discount điểm, không có voucher)
+                    // Vì voucher đã bị bake-in vào discountRatio ban đầu, phải tính lại từ đầu
+                    BigDecimal discountFromPointsVal = order.getDiscountFromPoints() != null ? order.getDiscountFromPoints() : BigDecimal.ZERO;
+                    BigDecimal discountRatioPoints = discountFromPointsVal.compareTo(BigDecimal.ZERO) > 0 && originalSubtotal.compareTo(BigDecimal.ZERO) > 0
+                            ? discountFromPointsVal.divide(originalSubtotal, 6, RoundingMode.HALF_UP)
+                            : BigDecimal.ZERO;
+
+                    computedRefundAmount = BigDecimal.ZERO;
+                    for (ReturnOrderLineItem item : returnLineItems) {
+                        BigDecimal originalUnitPrice = originalItemsMap.get(item.getVariantId()).getUnitPrice();
+                        BigDecimal newRefundPrice = originalUnitPrice.multiply(BigDecimal.ONE.subtract(discountRatioPoints)).setScale(0, RoundingMode.HALF_UP);
+                        BigDecimal newSubtotal = newRefundPrice.multiply(BigDecimal.valueOf(item.getQuantity())).setScale(0, RoundingMode.HALF_UP);
+                        item.setRefundPrice(newRefundPrice);   // Cập nhật refundPrice cho đúng trên phiếu trả hàng
+                        item.setSubtotal(newSubtotal);
+                        computedRefundAmount = computedRefundAmount.add(newSubtotal);
+                    }
+                    // Thu hồi toàn bộ số tiền Voucher (khấu trừ vào số tiền hoàn)
                     computedRefundAmount = computedRefundAmount.subtract(order.getDiscountFromVoucher());
                     if (computedRefundAmount.compareTo(BigDecimal.ZERO) < 0) {
                         computedRefundAmount = BigDecimal.ZERO;

@@ -12,4 +12,5 @@ public class PointConstant {
     public static final String TYPE_EARN = "EARN";
     public static final String TYPE_REDEEM = "REDEEM";
     public static final String TYPE_REFUND = "REFUND";
+    public static final String TYPE_RESERVED = "RESERVED"; // Tạm giữ điểm khi tạo đơn PENDING
 }

@@ -35,6 +35,7 @@ public class ResOrderDTO {
 
     private String voucherCode;
     private BigDecimal discountFromVoucher;
+    private BigDecimal voucherMinOrderValue;
 
     private OrderStatus status;
     private PaymentMethod paymentMethod;

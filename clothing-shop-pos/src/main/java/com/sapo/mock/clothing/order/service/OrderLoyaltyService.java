@@ -36,7 +36,7 @@ public class OrderLoyaltyService {
         }
 
         CustomerVoucher appliedVoucher = customerVoucherRepository
-                .findUnusedVoucherByCustomerAndCode(customer.getId(), dto.getVoucherCode().trim())
+                .findUnusedVoucherByCustomerAndCodeForUpdate(customer.getId(), dto.getVoucherCode().trim())
                 .orElseThrow(() -> new BadRequestException("Mã voucher không hợp lệ, không tồn tại hoặc đã được sử dụng"));
 
         Voucher voucher = appliedVoucher.getVoucher();
@@ -71,8 +71,11 @@ public class OrderLoyaltyService {
             return;
         }
 
-        if (customer.getRewardPoints() < dto.getPointsToUse()) {
-            throw new BadRequestException("Khách hàng không đủ điểm. Điểm hiện tại: " + customer.getRewardPoints());
+        Customer lockedCustomer = customerRepository.findByIdWithPessimisticLock(customer.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng ID: " + customer.getId()));
+
+        if (lockedCustomer.getRewardPoints() < dto.getPointsToUse()) {
+            throw new BadRequestException("Khách hàng không đủ điểm. Điểm hiện tại: " + lockedCustomer.getRewardPoints());
         }
 
         BigDecimal discount = BigDecimal.valueOf(dto.getPointsToUse()).multiply(PointConstant.REDEEM_RATE)
@@ -81,6 +84,10 @@ public class OrderLoyaltyService {
         int actualPointsUsed = discount.divideToIntegralValue(PointConstant.REDEEM_RATE).intValue();
         order.setPointsUsed(actualPointsUsed);
         order.setDiscountFromPoints(discount);
+
+        // RESERVE: Trừ điểm ngay để ngăn double spending
+        lockedCustomer.setRewardPoints(lockedCustomer.getRewardPoints() - actualPointsUsed);
+        customerRepository.save(lockedCustomer);
     }
 
     public void processLoyaltyOnCompletion(Order savedOrder, Customer customerParam, CustomerVoucher appliedVoucherParam) {
@@ -103,13 +110,8 @@ public class OrderLoyaltyService {
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng ID: " + customerParam.getId()));
 
             if (savedOrder.getPointsUsed() > 0) {
-                int newPoints = customer.getRewardPoints() - savedOrder.getPointsUsed();
-                if (newPoints < 0) {
-                    throw new BadRequestException("Khách hàng không đủ điểm tích lũy (Cần " + savedOrder.getPointsUsed() + " điểm, hiện có " + customer.getRewardPoints() + " điểm).");
-                }
-                customer.setRewardPoints(newPoints);
                 savePointHistory(customer.getId(), savedOrder.getId(), -savedOrder.getPointsUsed(),
-                        PointConstant.TYPE_REDEEM, "Sử dụng điểm cho đơn hàng " + savedOrder.getOrderNumber());
+                        PointConstant.TYPE_REDEEM, "Xác nhận sử dụng điểm cho đơn hàng " + savedOrder.getOrderNumber());
             }
             if (savedOrder.getPointsEarned() > 0) {
                 customer.setRewardPoints(customer.getRewardPoints() + savedOrder.getPointsEarned());
@@ -174,5 +176,12 @@ public class OrderLoyaltyService {
     public CustomerVoucher getAppliedVoucher(Integer orderId) {
         if (orderId == null) return null;
         return customerVoucherRepository.findByOrderId(orderId).orElse(null);
+    }
+
+    public void reservePoints(Order savedOrder, Customer customer) {
+        if (savedOrder.getPointsUsed() > 0 && customer.getId() != 1) {
+            savePointHistory(customer.getId(), savedOrder.getId(), -savedOrder.getPointsUsed(),
+                    PointConstant.TYPE_RESERVED, "Tạm giữ điểm cho đơn chờ thanh toán " + savedOrder.getOrderNumber());
+        }
     }
 }

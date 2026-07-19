@@ -18,6 +18,7 @@ import com.sapo.mock.clothing.util.constant.PointConstant;
 import com.sapo.mock.clothing.setting.service.SystemSettingService;
 import com.sapo.mock.clothing.payment.repository.PaymentLogRepository;
 import com.sapo.mock.clothing.entity.PaymentLog;
+import com.sapo.mock.clothing.customer.repository.CustomerVoucherRepository;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -54,6 +55,7 @@ public class OrderService {
     private final OrderNotificationHelper orderNotificationHelper;
     private final SystemSettingService systemSettingService;
     private final PaymentLogRepository paymentLogRepository;
+    private final CustomerVoucherRepository customerVoucherRepository;
 
     // Tạo đơn hàng mới
     @Transactional
@@ -92,8 +94,11 @@ public class OrderService {
         // Cập nhật lại referenceId trong StockLog sau khi có orderId thật
         // (ghi log 2 lần nếu muốn exact; đơn giản nhất là truyền orderId sau khi save)
 
-        if (order.getStatus() == OrderStatus.PENDING && appliedVoucher != null) {
-            orderLoyaltyService.reserveVoucher(appliedVoucher, savedOrder.getId());
+        if (order.getStatus() == OrderStatus.PENDING) {
+            if (appliedVoucher != null) {
+                orderLoyaltyService.reserveVoucher(appliedVoucher, savedOrder.getId());
+            }
+            orderLoyaltyService.reservePoints(savedOrder, customer);
         }
 
         if (order.getStatus() == OrderStatus.COMPLETED) {
@@ -417,6 +422,13 @@ public class OrderService {
         return mapToResOrderDTO(savedOrder, orderLineItemRepository.findByOrderId(savedOrder.getId()));
     }
 
+    private BigDecimal getVoucherMinOrderValue(Order order) {
+        if (order.getVoucherCode() == null) return null;
+        return customerVoucherRepository.findByOrderIdWithVoucher(order.getId())
+                .map(cv -> cv.getVoucher() != null ? cv.getVoucher().getMinOrderValue() : null)
+                .orElse(null);
+    }
+
     // Mapping đơn hàng sang ResOrderDTO
     private ResOrderDTO mapToResOrderDTO(Order savedOrder, List<OrderLineItem> lineItems) {
         List<ResOrderDTO.ResOrderItemDTO> resItems = lineItems.stream()
@@ -446,6 +458,7 @@ public class OrderService {
                 .discountFromPoints(savedOrder.getDiscountFromPoints())
                 .voucherCode(savedOrder.getVoucherCode())
                 .discountFromVoucher(savedOrder.getDiscountFromVoucher())
+                .voucherMinOrderValue(getVoucherMinOrderValue(savedOrder))
                 .status(savedOrder.getStatus())
                 .paymentMethod(savedOrder.getPaymentMethod())
                 .isPrinted(savedOrder.isPrinted())
