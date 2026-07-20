@@ -63,6 +63,16 @@ public class OrderService {
         User createdBy = getUserByUsername(username);
         Customer customer = getCustomerById(dto.getCustomerId());
 
+        // Chặn giam kho: Giới hạn số đơn PENDING tối đa per customer (Cài đặt động trong SystemSetting)
+        if (customer != null && customer.getId() != null && customer.getId() != 1) {
+            int maxPending = systemSettingService.getMaxPendingOrdersLimit();
+            long currentPending = orderRepository.countByCustomerIdAndStatus(customer.getId(), OrderStatus.PENDING);
+            if (currentPending >= maxPending) {
+                throw new BadRequestException("Khách hàng đang có " + currentPending 
+                        + " đơn hàng chưa thanh toán (Tối đa cho phép là " + maxPending + " đơn). Vui lòng hoàn tất hoặc hủy các đơn cũ trước khi tạo đơn mới.");
+            }
+        }
+
         Order order = new Order();
         initOrderInfo(order, dto, customer, createdBy);
 
@@ -86,13 +96,11 @@ public class OrderService {
 
         finalizeOrderAmounts(dto, order, totalAmount);
 
-        // Truyền orderNumber vào deductProductStock để ghi StockLog
-        orderInventoryService.deductProductStock(dto.getItems(), null, order.getOrderNumber());
-
         Order savedOrder = orderRepository.save(order);
         orderLineItemRepository.saveAll(lineItems);
-        // Cập nhật lại referenceId trong StockLog sau khi có orderId thật
-        // (ghi log 2 lần nếu muốn exact; đơn giản nhất là truyền orderId sau khi save)
+
+        // Truyền orderNumber và savedOrder.getId() thật vào deductProductStock để ghi StockLog
+        orderInventoryService.deductProductStock(dto.getItems(), savedOrder.getId(), savedOrder.getOrderNumber());
 
         if (order.getStatus() == OrderStatus.PENDING) {
             if (appliedVoucher != null) {
@@ -165,6 +173,14 @@ public class OrderService {
         orderInventoryService.restoreProductStock(oldItems, id, order.getOrderNumber());
         orderLineItemRepository.deleteAll(oldItems);
 
+        String oldVoucherCode = order.getVoucherCode();
+        String newVoucherCode = dto.getVoucherCode();
+        boolean isSamePublicVoucher = oldVoucherCode != null && !oldVoucherCode.isBlank()
+                && oldVoucherCode.trim().equalsIgnoreCase(newVoucherCode != null ? newVoucherCode.trim() : "");
+
+        // Hoàn trả Loyalty (Điểm & Voucher) của đơn PENDING cũ trước khi tính toán áp dụng lại (giữ slot nếu mã không đổi)
+        orderLoyaltyService.revertLoyaltyOnUpdate(order, customer, newVoucherCode);
+
         initOrderInfo(order, dto, customer, createdBy);
 
         // Bug #5 fix: Không cho cập nhật đơn hàng thành rỗng
@@ -175,7 +191,7 @@ public class OrderService {
         List<OrderLineItem> lineItems = new ArrayList<>();
         BigDecimal totalAmount = buildOrderItems(dto.getItems(), order, lineItems);
 
-        CustomerVoucher appliedVoucher = orderLoyaltyService.applyVoucher(dto, order, customer, totalAmount);
+        CustomerVoucher appliedVoucher = orderLoyaltyService.applyVoucher(dto, order, customer, totalAmount, isSamePublicVoucher);
         totalAmount = totalAmount.subtract(order.getDiscountFromVoucher());
 
         orderLoyaltyService.applyPoints(dto, order, customer, totalAmount);
@@ -223,6 +239,9 @@ public class OrderService {
         if (order.getStatus() == OrderStatus.CANCELLED) {
             throw new BadRequestException("Đơn hàng này đã bị hủy trước đó");
         }
+        if (order.getStatus() == OrderStatus.COMPLETED) {
+            throw new BadRequestException("Không thể hủy đơn hàng vì đơn hàng đã thanh toán/hoàn thành.");
+        }
         if (order.getStatus() == OrderStatus.RETURNED || order.getStatus() == OrderStatus.PARTIALLY_RETURNED) {
             throw new BadRequestException("Không thể hủy đơn hàng đã có trả hàng. Vui lòng xử lý qua phiếu trả hàng.");
         }
@@ -231,13 +250,17 @@ public class OrderService {
         order.setStatus(OrderStatus.CANCELLED);
         order.setCancelReason(dto.getReason());
         order.setPaidAmount(BigDecimal.ZERO);
-        order.setTotalAmount(BigDecimal.ZERO);
         Order savedOrder = orderRepository.save(order);
 
         Customer customer = getCustomerById(order.getCustomerId());
 
         if (previousStatus == OrderStatus.COMPLETED || previousStatus == OrderStatus.PENDING) {
             orderLoyaltyService.revertLoyaltyOnCancel(savedOrder, customer);
+        }
+
+        if (previousStatus == OrderStatus.COMPLETED) {
+            // Bắn sự kiện trừ doanh số âm để trừ totalSpent và tính lại hạng cho khách hàng
+            eventPublisher.publishEvent(new OrderCompletedEvent(savedOrder.getCustomerId(), savedOrder.getTotalAmount().negate()));
         }
 
         List<OrderLineItem> items = orderLineItemRepository.findByOrderId(id);
@@ -265,8 +288,12 @@ public class OrderService {
 
     // Lấy thông tin khách hàng
     private Customer getCustomerById(Integer id) {
-        return customerRepository.findById(id)
+        Customer customer = customerRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Khách hàng ID " + id + " không tồn tại"));
+        if (id != 1 && customer.getStatus() != com.sapo.mock.clothing.util.constant.CustomerStatusEnum.ACTIVE) {
+            throw new BadRequestException("Tài khoản khách hàng đã bị khóa hoặc ngừng hoạt động.");
+        }
+        return customer;
     }
 
     // Lấy thông tin đơn hàng
@@ -336,7 +363,11 @@ public class OrderService {
                 throw new BadRequestException(
                         "Số tiền khách đưa (" + paid + ") không đủ để thanh toán đơn hàng (" + totalAmount + ")");
             }
-            order.setChangeAmount(paid.subtract(totalAmount));
+            if (order.getPaymentMethod() == PaymentMethod.CASH) {
+                order.setChangeAmount(paid.subtract(totalAmount));
+            } else {
+                order.setChangeAmount(BigDecimal.ZERO);
+            }
             order.setPointsEarned(order.getCustomerId() == 1 ? 0
                     : totalAmount.divideToIntegralValue(PointConstant.EARN_RATE).intValue());
         } else {
@@ -363,7 +394,14 @@ public class OrderService {
         order.setStatus(OrderStatus.COMPLETED);
         order.setPaymentMethod(PaymentMethod.QR_SEPAY);
         order.setPaidAmount(paidAmount);
-        order.setChangeAmount(paidAmount.subtract(order.getTotalAmount()));
+        
+        BigDecimal overpaid = paidAmount.subtract(order.getTotalAmount());
+        // Tiền thối chỉ áp dụng cho TIỀN MẶT. Khóa changeAmount = 0 cho QR_SEPAY để tránh thất thoát tiền mặt.
+        order.setChangeAmount(BigDecimal.ZERO);
+        
+        if (overpaid.compareTo(BigDecimal.ZERO) > 0) {
+            orderNotificationHelper.sendOverpaymentNotification(order, overpaid);
+        }
         order.setPointsEarned(order.getCustomerId() == 1 ? 0
                 : order.getTotalAmount().divideToIntegralValue(PointConstant.EARN_RATE).intValue());
 
@@ -392,9 +430,14 @@ public class OrderService {
         }
 
         order.setStatus(OrderStatus.COMPLETED);
-        order.setPaymentMethod(paymentMethod != null ? PaymentMethod.valueOf(paymentMethod) : PaymentMethod.CASH);
+        PaymentMethod finalMethod = paymentMethod != null ? PaymentMethod.valueOf(paymentMethod) : PaymentMethod.CASH;
+        order.setPaymentMethod(finalMethod);
         order.setPaidAmount(amount);
-        order.setChangeAmount(amount.subtract(order.getTotalAmount()));
+        if (finalMethod == PaymentMethod.CASH) {
+            order.setChangeAmount(amount.subtract(order.getTotalAmount()));
+        } else {
+            order.setChangeAmount(BigDecimal.ZERO);
+        }
         order.setPointsEarned(order.getCustomerId() == 1 ? 0
                 : order.getTotalAmount().divideToIntegralValue(PointConstant.EARN_RATE).intValue());
 

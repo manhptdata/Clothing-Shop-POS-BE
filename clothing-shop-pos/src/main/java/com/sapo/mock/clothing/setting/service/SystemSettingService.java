@@ -9,4 +9,5 @@ public interface SystemSettingService {
     SystemSetting updateSetting(String key, String value);
     boolean isReturnApprovalRequired();
     boolean isCancelApprovalRequired();
+    int getMaxPendingOrdersLimit();
 }

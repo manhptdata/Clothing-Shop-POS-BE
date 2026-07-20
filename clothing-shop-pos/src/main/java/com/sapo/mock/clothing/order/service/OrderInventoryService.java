@@ -38,7 +38,11 @@ public class OrderInventoryService {
      */
     public void deductProductStock(List<ReqCreateOrderDTO.OrderItemDTO> items,
                                    Integer orderId, String orderNumber) {
-        for (ReqCreateOrderDTO.OrderItemDTO itemDto : items) {
+        // Anti-deadlock: Sắp xếp theo variantId tăng dần để luôn lock theo thứ tự cố định
+        List<ReqCreateOrderDTO.OrderItemDTO> sortedItems = items.stream()
+                .sorted(java.util.Comparator.comparing(ReqCreateOrderDTO.OrderItemDTO::getVariantId))
+                .toList();
+        for (ReqCreateOrderDTO.OrderItemDTO itemDto : sortedItems) {
             ProductVariant variant = productVariantRepository.findByIdWithPessimisticLock(itemDto.getVariantId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Không tìm thấy sản phẩm ID " + itemDto.getVariantId()));
@@ -122,7 +126,11 @@ public class OrderInventoryService {
      * @param orderNumber mã đơn hàng gốc
      */
     public void restoreProductStock(List<OrderLineItem> items, Integer orderId, String orderNumber) {
-        for (OrderLineItem item : items) {
+        // Anti-deadlock: Sắp xếp theo variantId tăng dần để luôn lock theo thứ tự cố định
+        List<OrderLineItem> sortedItems = items.stream()
+                .sorted(java.util.Comparator.comparing(OrderLineItem::getVariantId))
+                .toList();
+        for (OrderLineItem item : sortedItems) {
             ProductVariant variant = productVariantRepository.findByIdWithPessimisticLock(item.getVariantId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Không tìm thấy thông tin tồn kho của sản phẩm ID " + item.getVariantId()));

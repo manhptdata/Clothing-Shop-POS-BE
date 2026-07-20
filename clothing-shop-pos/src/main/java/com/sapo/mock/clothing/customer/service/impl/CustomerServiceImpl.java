@@ -14,6 +14,8 @@ import com.sapo.mock.clothing.entity.Order;
 import com.sapo.mock.clothing.exception.BadRequestException;
 import com.sapo.mock.clothing.exception.ResourceNotFoundException;
 import com.sapo.mock.clothing.util.constant.CustomerStatusEnum;
+import com.sapo.mock.clothing.util.constant.VoucherCampaignStatusEnum;
+import java.time.Instant;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -76,7 +78,15 @@ public class CustomerServiceImpl implements CustomerService {
         List<CustomerVoucher> vouchers =
                 customerVoucherRepository.findByCustomerIdOrderByReceivedAtDesc(customer.getId());
         if (vouchers != null && !vouchers.isEmpty()) {
-            List<CustomerResponse.VoucherInfo> voucherInfos = vouchers.stream().map(cv -> {
+            Instant now = Instant.now();
+            List<CustomerResponse.VoucherInfo> voucherInfos = vouchers.stream()
+                    .filter(cv -> {
+                        if (cv.getVoucher() == null) return false;
+                        if (cv.getVoucher().getStatus() != VoucherCampaignStatusEnum.ACTIVE) return false;
+                        if (cv.getVoucher().getEndDate() != null && now.isAfter(cv.getVoucher().getEndDate())) return false;
+                        return true;
+                    })
+                    .map(cv -> {
                 CustomerResponse.VoucherInfo vi = new CustomerResponse.VoucherInfo();
                 vi.setId(cv.getId());
                 vi.setVoucherCode(cv.getVoucher().getCode());
@@ -258,6 +268,74 @@ public class CustomerServiceImpl implements CustomerService {
         return response;
     }
 
+    @Autowired
+    private com.sapo.mock.clothing.customer.repository.VoucherRepository voucherRepository;
 
+    @Override
+    @Transactional
+    public void revokeCustomerVoucher(Integer customerVoucherId) {
+        CustomerVoucher cv = customerVoucherRepository.findById(customerVoucherId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy voucher trong ví khách hàng"));
+        
+        com.sapo.mock.clothing.entity.Voucher voucher = voucherRepository.findByIdWithPessimisticLock(cv.getVoucher().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy voucher gốc"));
+        
+        if (voucher.getIssuedQuantity() > 0) {
+            voucher.setIssuedQuantity(voucher.getIssuedQuantity() - 1);
+            voucherRepository.save(voucher);
+        }
+
+        customerVoucherRepository.delete(cv);
+    }
+
+    @Override
+    @Transactional
+    public void giveCustomerVoucher(Integer customerId, Integer voucherId) {
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng"));
+        com.sapo.mock.clothing.entity.Voucher voucher = voucherRepository.findByIdWithPessimisticLock(voucherId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chương trình voucher"));
+
+        // 1. Kiểm tra trạng thái chương trình
+        if (voucher.getStatus() != com.sapo.mock.clothing.util.constant.VoucherCampaignStatusEnum.ACTIVE) {
+            throw new BadRequestException("Chương trình voucher này đang tạm dừng hoặc đã kết thúc!");
+        }
+
+        // 2. Kiểm tra tổng số lượng phát hành (Ngân sách)
+        if (voucher.getTotalQuantity() != null && voucher.getIssuedQuantity() != null
+                && voucher.getIssuedQuantity() >= voucher.getTotalQuantity()) {
+            throw new BadRequestException("Chương trình voucher này đã hết số lượng phát hành!");
+        }
+
+        // 3. Kiểm tra số lần phát tối đa cho 1 khách hàng
+        int maxUsagePerUser = voucher.getMaxUsagePerUser() != null ? voucher.getMaxUsagePerUser() : 1;
+        long issuedCount = customerVoucherRepository.countByCustomerIdAndVoucherId(customerId, voucherId);
+        if (issuedCount >= maxUsagePerUser) {
+            throw new BadRequestException("Khách hàng này đã nhận tối đa " + maxUsagePerUser + " lượt cho chương trình voucher này!");
+        }
+
+        // 4. Tính hạn sử dụng
+        Instant expiredAt = voucher.getEndDate();
+        if (expiredAt == null) {
+            // Hạn sử dụng mặc định là 30 ngày nếu chương trình voucher không cài ngày kết thúc
+            expiredAt = Instant.now().plus(30, java.time.temporal.ChronoUnit.DAYS);
+        }
+
+        try {
+            CustomerVoucher cv = new CustomerVoucher();
+            cv.setCustomer(customer);
+            cv.setVoucher(voucher);
+            cv.setStatus(com.sapo.mock.clothing.util.constant.CustomerVoucherStatusEnum.UNUSED);
+            cv.setReceivedAt(Instant.now());
+            cv.setExpiredAt(expiredAt);
+            customerVoucherRepository.save(cv);
+
+            // Cập nhật số lượng đã phát (issuedQuantity) của voucher
+            voucher.setIssuedQuantity((voucher.getIssuedQuantity() != null ? voucher.getIssuedQuantity() : 0) + 1);
+            voucherRepository.save(voucher);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            throw new BadRequestException("Không thể tặng voucher do dữ liệu không hợp lệ.");
+        }
+    }
 }
 

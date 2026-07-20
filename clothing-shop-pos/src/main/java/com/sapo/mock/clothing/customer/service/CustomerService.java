@@ -35,7 +35,8 @@ public interface CustomerService {
 
     Page<OrderHistoryResponse> getCustomerOrders(Integer customerId, String keyword, Pageable pageable);
 
+    void revokeCustomerVoucher(Integer customerVoucherId);
 
-
+    void giveCustomerVoucher(Integer customerId, Integer voucherId);
 }
 

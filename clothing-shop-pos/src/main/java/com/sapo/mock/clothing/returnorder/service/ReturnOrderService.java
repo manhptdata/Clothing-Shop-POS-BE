@@ -5,6 +5,7 @@ import com.sapo.mock.clothing.customer.dto.event.OrderCompletedEvent;
 import com.sapo.mock.clothing.customer.repository.CustomerRepository;
 import com.sapo.mock.clothing.customer.repository.CustomerVoucherRepository;
 import com.sapo.mock.clothing.customer.repository.PointHistoryRepository;
+import com.sapo.mock.clothing.customer.repository.VoucherRepository;
 import com.sapo.mock.clothing.entity.Customer;
 import com.sapo.mock.clothing.entity.Order;
 import com.sapo.mock.clothing.entity.OrderLineItem;
@@ -30,6 +31,7 @@ import com.sapo.mock.clothing.util.constant.StockLogReferenceType;
 import com.sapo.mock.clothing.util.constant.StockLogSource;
 import com.sapo.mock.clothing.entity.StockLog;
 import com.sapo.mock.clothing.setting.service.SystemSettingService;
+import com.sapo.mock.clothing.order.service.OrderLoyaltyService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -65,10 +67,12 @@ public class ReturnOrderService {
     private final CustomerRepository customerRepository;
     private final PointHistoryRepository pointHistoryRepository;
     private final CustomerVoucherRepository customerVoucherRepository;
+    private final VoucherRepository voucherRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final StockLogRepository stockLogRepository;
     private final SystemSettingService systemSettingService;
     private final PasswordEncoder passwordEncoder;
+    private final OrderLoyaltyService orderLoyaltyService;
 
     @Transactional
     public ResReturnOrderDTO createReturn(ReqCreateReturnDTO dto, String username) {
@@ -155,13 +159,29 @@ public class ReturnOrderService {
         returnOrder.setReason(dto.getReason());
 
         String dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        Instant startOfDay = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant();
-        long countToday = returnOrderRepository.countByCreatedAtAfter(startOfDay);
-        String returnNumber = "RTN-" + dateStr + "-" + String.format("%03d", countToday + 1);
+        String timeStr = java.time.LocalTime.now().format(DateTimeFormatter.ofPattern("HHmmssSSS"));
+        String returnNumber = "RTN-" + dateStr + "-" + timeStr;
         returnOrder.setReturnNumber(returnNumber);
+
+        // Gom nhóm số lượng trả lại từ DTO
+        Map<Integer, Integer> dtoQuantityMap = new HashMap<>();
+        for (ReqCreateReturnDTO.ReturnItemDTO ri : dto.getItems()) {
+            dtoQuantityMap.put(ri.getVariantId(), dtoQuantityMap.getOrDefault(ri.getVariantId(), 0) + ri.getQuantity());
+        }
+
+        boolean isAllReturned = true;
+        for (OrderLineItem originalItem : originalItems) {
+            int currentReturnedInDto = dtoQuantityMap.getOrDefault(originalItem.getVariantId(), 0);
+            int totalReturnedForVariant = alreadyReturnedMap.getOrDefault(originalItem.getVariantId(), 0) + currentReturnedInDto;
+            if (totalReturnedForVariant < originalItem.getQuantity()) {
+                isAllReturned = false;
+                break;
+            }
+        }
 
         List<ReturnOrderLineItem> returnLineItems = new ArrayList<>();
         BigDecimal computedRefundAmount = BigDecimal.ZERO;
+        BigDecimal returnedItemsSubtotal = BigDecimal.ZERO;
 
         for (ReqCreateReturnDTO.ReturnItemDTO returnItemDto : dto.getItems()) {
             OrderLineItem originalItem = originalItemsMap.get(returnItemDto.getVariantId());
@@ -176,6 +196,8 @@ public class ReturnOrderService {
                 throw new BadRequestException("Sản phẩm " + originalItem.getProductName() + " đã trả " + alreadyReturned 
                         + " chiếc. Số lượng muốn trả tiếp (" + returnItemDto.getQuantity() + ") vượt quá số lượng còn lại có thể trả (" + remainingAllowed + ").");
             }
+            
+            alreadyReturnedMap.put(returnItemDto.getVariantId(), alreadyReturned + returnItemDto.getQuantity());
 
             ProductVariant variant = productVariantRepository.findByIdWithPessimisticLock(returnItemDto.getVariantId())
                     .orElseThrow(() -> new ResourceNotFoundException("Sản phẩm phân loại ID " + returnItemDto.getVariantId() + " không tồn tại"));
@@ -199,10 +221,13 @@ public class ReturnOrderService {
             stockLog.setCreatedBy(createdBy);
             stockLogRepository.save(stockLog);
 
-            // Tính đơn giá hoàn lại sau khi trừ chiết khấu tỷ lệ, làm tròn đến hàng đơn vị VND
+            // Tính tổng tiền hoàn lại của món này (làm tròn ở bước cuối cùng để tránh sai số)
             BigDecimal unitPrice = originalItem.getUnitPrice();
-            BigDecimal refundPrice = unitPrice.multiply(BigDecimal.ONE.subtract(discountRatio)).setScale(0, RoundingMode.HALF_UP);
-            BigDecimal itemSubtotal = refundPrice.multiply(BigDecimal.valueOf(returnItemDto.getQuantity())).setScale(0, RoundingMode.HALF_UP);
+            BigDecimal refundPriceUnrounded = unitPrice.multiply(BigDecimal.ONE.subtract(discountRatio));
+            BigDecimal itemSubtotal = refundPriceUnrounded.multiply(BigDecimal.valueOf(returnItemDto.getQuantity())).setScale(0, RoundingMode.HALF_UP);
+
+            // Tính lại đơn giá hoàn trả để lưu database/hiển thị hóa đơn (bằng tổng / số lượng)
+            BigDecimal refundPrice = itemSubtotal.divide(BigDecimal.valueOf(returnItemDto.getQuantity()), 0, RoundingMode.HALF_UP);
 
             ReturnOrderLineItem returnLineItem = new ReturnOrderLineItem();
             returnLineItem.setReturnOrder(returnOrder);
@@ -215,7 +240,10 @@ public class ReturnOrderService {
 
             returnLineItems.add(returnLineItem);
             computedRefundAmount = computedRefundAmount.add(itemSubtotal);
+            returnedItemsSubtotal = returnedItemsSubtotal.add(originalItem.getUnitPrice().multiply(BigDecimal.valueOf(returnItemDto.getQuantity())));
         }
+
+        BigDecimal unpenalizedCurrentRefund = computedRefundAmount;
 
         // Cửa hàng chỉ hoàn lại số tiền thực tế khách đã trả
         BigDecimal previousRefundTotal = returnOrderRepository.getTotalRefundedByOrderId(order.getId());
@@ -228,70 +256,40 @@ public class ReturnOrderService {
             computedRefundAmount = remainingOrderPaidAmount;
         }
         
-        // RE-EVALUATE VOUCHER: Kiểm tra nếu giá trị đơn hàng còn lại không còn thỏa mãn Min Order Value của Voucher
-        BigDecimal newOrderValue = order.getTotalAmount().subtract(computedRefundAmount).subtract(previousRefundTotal);
-        if (order.getVoucherCode() != null && order.getDiscountFromVoucher() != null && order.getDiscountFromVoucher().compareTo(BigDecimal.ZERO) > 0) {
-            com.sapo.mock.clothing.entity.CustomerVoucher appliedVoucher = customerVoucherRepository.findByOrderId(order.getId()).orElse(null);
-            if (appliedVoucher != null && appliedVoucher.getVoucher().getMinOrderValue() != null) {
-                if (newOrderValue.compareTo(appliedVoucher.getVoucher().getMinOrderValue()) < 0) {
-                    // BƯỚC 1: Tính lại hoàn tiền theo giá gốc (chỉ áp dụng discount điểm, không có voucher)
-                    // Vì voucher đã bị bake-in vào discountRatio ban đầu, phải tính lại từ đầu
-                    BigDecimal discountFromPointsVal = order.getDiscountFromPoints() != null ? order.getDiscountFromPoints() : BigDecimal.ZERO;
-                    BigDecimal discountRatioPoints = discountFromPointsVal.compareTo(BigDecimal.ZERO) > 0 && originalSubtotal.compareTo(BigDecimal.ZERO) > 0
-                            ? discountFromPointsVal.divide(originalSubtotal, 6, RoundingMode.HALF_UP)
-                            : BigDecimal.ZERO;
-
-                    computedRefundAmount = BigDecimal.ZERO;
-                    for (ReturnOrderLineItem item : returnLineItems) {
-                        BigDecimal originalUnitPrice = originalItemsMap.get(item.getVariantId()).getUnitPrice();
-                        BigDecimal newRefundPrice = originalUnitPrice.multiply(BigDecimal.ONE.subtract(discountRatioPoints)).setScale(0, RoundingMode.HALF_UP);
-                        BigDecimal newSubtotal = newRefundPrice.multiply(BigDecimal.valueOf(item.getQuantity())).setScale(0, RoundingMode.HALF_UP);
-                        item.setRefundPrice(newRefundPrice);   // Cập nhật refundPrice cho đúng trên phiếu trả hàng
-                        item.setSubtotal(newSubtotal);
-                        computedRefundAmount = computedRefundAmount.add(newSubtotal);
-                    }
-                    // Thu hồi toàn bộ số tiền Voucher (khấu trừ vào số tiền hoàn)
-                    computedRefundAmount = computedRefundAmount.subtract(order.getDiscountFromVoucher());
-                    if (computedRefundAmount.compareTo(BigDecimal.ZERO) < 0) {
-                        computedRefundAmount = BigDecimal.ZERO;
-                    }
-                    // Ngắt kết nối voucher với đơn hàng để không bị trừ lặp lại
-                    order.setDiscountFromVoucher(BigDecimal.ZERO);
-                    order.setVoucherCode(null);
-                    
-                    // BƯỚC 2: Hoàn trả Voucher nguyên vẹn cho khách hàng
-                    if (appliedVoucher.getExpiredAt().isBefore(java.time.Instant.now())) {
-                        appliedVoucher.setStatus(com.sapo.mock.clothing.util.constant.CustomerVoucherStatusEnum.EXPIRED);
-                    } else {
-                        appliedVoucher.setStatus(com.sapo.mock.clothing.util.constant.CustomerVoucherStatusEnum.UNUSED);
-                    }
-                    appliedVoucher.setUsedAt(null);
-                    appliedVoucher.setOrderId(null);
-                    customerVoucherRepository.save(appliedVoucher);
+        BigDecimal previousReturnedSubtotal = BigDecimal.ZERO;
+        BigDecimal previousUnpenalizedRefundTotal = BigDecimal.ZERO;
+        for (ReturnOrder ro : existingReturns) {
+            for (ReturnOrderLineItem item : ro.getItems()) {
+                OrderLineItem origItem = originalItemsMap.get(item.getVariantId());
+                if (origItem != null) {
+                    previousReturnedSubtotal = previousReturnedSubtotal.add(origItem.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())));
                 }
+                previousUnpenalizedRefundTotal = previousUnpenalizedRefundTotal.add(item.getSubtotal());
             }
         }
 
-        returnOrder.setTotalRefundAmount(computedRefundAmount);
+        // Kiểm tra chặn nếu TRẢ 1 PHẦN làm rớt hóa đơn xuống dưới điều kiện Voucher
+        // Fix Issue 2: Giá trị đơn hàng mới tính dựa trên giá trị hàng hóa đã trả (chưa trừ phạt) thay vì tiền đã hoàn (đã trừ phạt)
+        BigDecimal newOrderValue = order.getTotalAmount().subtract(unpenalizedCurrentRefund).subtract(previousUnpenalizedRefundTotal);
+        if (newOrderValue.compareTo(BigDecimal.ZERO) < 0) {
+            newOrderValue = BigDecimal.ZERO;
+        }
 
-        // Lưu đơn trả hàng
-        ReturnOrder savedReturnOrder = returnOrderRepository.save(returnOrder);
-        returnOrderLineItemRepository.saveAll(returnLineItems);
+        BigDecimal newSubtotal = originalSubtotal.subtract(previousReturnedSubtotal).subtract(returnedItemsSubtotal);
 
-        // Cập nhật trạng thái đơn hàng gốc
-        boolean isAllReturned = true;
-        for (OrderLineItem originalItem : originalItems) {
-            int currentReturnedInDto = 0;
-            for (ReqCreateReturnDTO.ReturnItemDTO ri : dto.getItems()) {
-                if (ri.getVariantId().equals(originalItem.getVariantId())) {
-                    currentReturnedInDto = ri.getQuantity();
-                    break;
+        if (!isAllReturned && order.getVoucherCode() != null && !order.getVoucherCode().isBlank()) {
+            BigDecimal minOrderValue = null;
+            com.sapo.mock.clothing.entity.CustomerVoucher appliedVoucher = customerVoucherRepository.findByOrderId(order.getId()).orElse(null);
+            if (appliedVoucher != null && appliedVoucher.getVoucher() != null) {
+                minOrderValue = appliedVoucher.getVoucher().getMinOrderValue();
+            } else {
+                com.sapo.mock.clothing.entity.Voucher publicVoucher = voucherRepository.findByCode(order.getVoucherCode()).orElse(null);
+                if (publicVoucher != null) {
+                    minOrderValue = publicVoucher.getMinOrderValue();
                 }
             }
-            int totalReturnedForVariant = alreadyReturnedMap.getOrDefault(originalItem.getVariantId(), 0) + currentReturnedInDto;
-            if (totalReturnedForVariant < originalItem.getQuantity()) {
-                isAllReturned = false;
-                break;
+            if (minOrderValue != null && newSubtotal.compareTo(minOrderValue) < 0) {
+                throw new BadRequestException("Việc trả một phần hàng làm đơn hàng không còn đủ điều kiện áp dụng Voucher (Min Order " + minOrderValue + "). Vui lòng yêu cầu khách trả toàn bộ đơn hàng (hoặc giữ nguyên đơn).");
             }
         }
 
@@ -301,29 +299,73 @@ public class ReturnOrderService {
             Customer lockedCustomer = customerRepository.findByIdWithPessimisticLock(customer.getId())
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng ID: " + customer.getId()));
 
-            // 1. Hoàn lại điểm đã sử dụng nếu trả hàng toàn bộ (giữ nguyên logic cũ)
-            if (isAllReturned && order.getPointsUsed() > 0) {
-                lockedCustomer.setRewardPoints(lockedCustomer.getRewardPoints() + order.getPointsUsed());
-                PointHistory phRefund = new PointHistory();
-                phRefund.setCustomerId(lockedCustomer.getId());
-                phRefund.setOrderId(order.getId());
-                phRefund.setPointsChange(order.getPointsUsed());
-                phRefund.setType(PointConstant.TYPE_REFUND);
-                phRefund.setDescription("Hoàn điểm đã dùng do khách trả hàng toàn bộ đơn " + order.getOrderNumber());
-                pointHistoryRepository.save(phRefund);
+            // 1. Hoàn lại điểm tiêu dùng theo tỷ lệ phần giá trị trả lại (Proportional Refund)
+            if (order.getPointsUsed() > 0) {
+                BigDecimal returnRatio = BigDecimal.ZERO;
+                if (originalSubtotal.compareTo(BigDecimal.ZERO) > 0) {
+                    returnRatio = returnedItemsSubtotal.divide(originalSubtotal, 4, RoundingMode.HALF_UP);
+                }
+
+                int pointsToRefund = BigDecimal.valueOf(order.getPointsUsed()).multiply(returnRatio).intValue();
+
+                if (pointsToRefund > 0) {
+                    lockedCustomer.setRewardPoints(lockedCustomer.getRewardPoints() + pointsToRefund);
+                    PointHistory phRefund = new PointHistory();
+                    phRefund.setCustomerId(lockedCustomer.getId());
+                    phRefund.setOrderId(order.getId());
+                    phRefund.setPointsChange(pointsToRefund);
+                    phRefund.setType(PointConstant.TYPE_REFUND);
+                    phRefund.setDescription("Hoàn điểm tiêu dùng theo tỷ lệ do trả hàng đơn " + order.getOrderNumber());
+                    pointHistoryRepository.save(phRefund);
+                }
             }
 
-            // 2. Đồng nhất công thức TRỪ điểm tích lũy cho cả trả 1 phần và trả toàn bộ
-            int pointsToDeduct = computedRefundAmount.divideToIntegralValue(PointConstant.EARN_RATE).intValue();
+            // 2. Khấu trừ điểm bằng công thức Chống Sai Số (Trả nhiều lần) - Fix Issue 3 (Double-Penalize)
+            // Tính số điểm ĐÁNG LẼ phải trừ của các lần trước (dựa trên giá trị hàng hóa trả lại chưa trừ phạt)
+            BigDecimal previousNewOrderValue = order.getTotalAmount().subtract(previousUnpenalizedRefundTotal);
+            if (previousNewOrderValue.compareTo(BigDecimal.ZERO) < 0) previousNewOrderValue = BigDecimal.ZERO;
+            int previousEarnedPoints = previousNewOrderValue.divideToIntegralValue(PointConstant.EARN_RATE).intValue();
+            int previousTheoreticalDeducted = order.getPointsEarned() - previousEarnedPoints;
+            if (previousTheoreticalDeducted < 0) previousTheoreticalDeducted = 0;
+
+            // Tính TỔNG số điểm phải trừ tính đến hiện tại
+            int currentEarnedPoints = newOrderValue.divideToIntegralValue(PointConstant.EARN_RATE).intValue();
+            int currentTheoreticalDeductedTotal = order.getPointsEarned() - currentEarnedPoints;
+            if (currentTheoreticalDeductedTotal < 0) currentTheoreticalDeductedTotal = 0;
+
+            // Số điểm thực sự cần trừ CỦA LẦN NÀY (Bao gồm cả điểm bù bằng tiền mặt hoặc điểm ví)
+            int pointsToDeduct = currentTheoreticalDeductedTotal - previousTheoreticalDeducted;
             if (pointsToDeduct > 0) {
-                lockedCustomer.setRewardPoints(Math.max(0, lockedCustomer.getRewardPoints() - pointsToDeduct));
-                PointHistory phDeduct = new PointHistory();
-                phDeduct.setCustomerId(lockedCustomer.getId());
-                phDeduct.setOrderId(order.getId());
-                phDeduct.setPointsChange(-pointsToDeduct);
-                phDeduct.setType(PointConstant.TYPE_REFUND);
-                phDeduct.setDescription("Khấu trừ điểm tích lũy do khách trả hàng đơn " + order.getOrderNumber());
-                pointHistoryRepository.save(phDeduct);
+                int currentPoints = lockedCustomer.getRewardPoints();
+                if (currentPoints < pointsToDeduct) {
+                    int deficitPoints = pointsToDeduct - currentPoints;
+                    BigDecimal penaltyAmount = PointConstant.REDEEM_RATE.multiply(BigDecimal.valueOf(deficitPoints));
+                    
+                    computedRefundAmount = computedRefundAmount.subtract(penaltyAmount);
+                    if (computedRefundAmount.compareTo(BigDecimal.ZERO) < 0) {
+                        computedRefundAmount = BigDecimal.ZERO;
+                    }
+                    
+                    lockedCustomer.setRewardPoints(0);
+                    
+                    PointHistory phDeduct = new PointHistory();
+                    phDeduct.setCustomerId(lockedCustomer.getId());
+                    phDeduct.setOrderId(order.getId());
+                    phDeduct.setPointsChange(-currentPoints);
+                    phDeduct.setType(PointConstant.TYPE_REFUND);
+                    phDeduct.setDescription("Khấu trừ toàn bộ điểm hiện có và cấn trừ " + penaltyAmount + " VNĐ vào tiền hoàn trả do khách trả hàng đơn " + order.getOrderNumber());
+                    pointHistoryRepository.save(phDeduct);
+                } else {
+                    lockedCustomer.setRewardPoints(currentPoints - pointsToDeduct);
+                    
+                    PointHistory phDeduct = new PointHistory();
+                    phDeduct.setCustomerId(lockedCustomer.getId());
+                    phDeduct.setOrderId(order.getId());
+                    phDeduct.setPointsChange(-pointsToDeduct);
+                    phDeduct.setType(PointConstant.TYPE_REFUND);
+                    phDeduct.setDescription("Khấu trừ điểm tích lũy do khách trả hàng đơn " + order.getOrderNumber());
+                    pointHistoryRepository.save(phDeduct);
+                }
             }
             customerRepository.save(lockedCustomer);
 
@@ -331,20 +373,19 @@ public class ReturnOrderService {
             eventPublisher.publishEvent(new OrderCompletedEvent(lockedCustomer.getId(), computedRefundAmount.negate()));
         }
 
+        returnOrder.setTotalRefundAmount(computedRefundAmount);
+
+        // Lưu đơn trả hàng
+        ReturnOrder savedReturnOrder = returnOrderRepository.save(returnOrder);
+        returnOrderLineItemRepository.saveAll(returnLineItems);
+
+        // Cập nhật trạng thái đơn hàng gốc
+
         if (isAllReturned) {
             order.setStatus(OrderStatus.RETURNED);
             
-            // Hoàn voucher về trạng thái chưa dùng nếu trả hàng toàn bộ 100%
-            customerVoucherRepository.findByOrderId(order.getId()).ifPresent(cv -> {
-                if (cv.getExpiredAt().isBefore(Instant.now())) {
-                    cv.setStatus(com.sapo.mock.clothing.util.constant.CustomerVoucherStatusEnum.EXPIRED);
-                } else {
-                    cv.setStatus(com.sapo.mock.clothing.util.constant.CustomerVoucherStatusEnum.UNUSED);
-                }
-                cv.setUsedAt(null);
-                cv.setOrderId(null);
-                customerVoucherRepository.save(cv);
-            });
+            // Chỉ phục hồi Voucher về trạng thái UNUSED (Không được gọi hàm hoàn/trừ điểm vì đã tính toán trên vòng lặp)
+            orderLoyaltyService.revertVoucherOnlyOnCancel(order, customer);
         } else {
             order.setStatus(OrderStatus.PARTIALLY_RETURNED);
         }

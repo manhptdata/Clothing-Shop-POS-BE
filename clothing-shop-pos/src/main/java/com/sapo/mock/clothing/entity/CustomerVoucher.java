@@ -10,7 +10,9 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table(name = "customer_voucher")
+@Table(name = "customer_voucher", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_customer_voucher_issue", columnNames = {"customer_id", "voucher_id", "issue_year"})
+})
 public class CustomerVoucher {
 
     @Id
@@ -40,4 +42,7 @@ public class CustomerVoucher {
 
     @Column(name = "order_id")
     private Integer orderId;
+
+    @Column(name = "issue_year")
+    private Integer issueYear;
 }
