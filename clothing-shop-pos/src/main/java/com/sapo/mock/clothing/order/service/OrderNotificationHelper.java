@@ -74,4 +74,21 @@ public class OrderNotificationHelper {
             log.error("Lỗi gửi thông báo thanh toán thiếu: {}", e.getMessage(), e);
         }
     }
+
+    public void sendOverpaymentNotification(Order order, BigDecimal overpaidAmount) {
+        try {
+            DecimalFormat df = new DecimalFormat("#,###", new DecimalFormatSymbols(Locale.US));
+            Notification notif = new Notification();
+            notif.setTitle("Thanh toán thừa tiền QR");
+            notif.setMessage(String.format("Đơn hàng %s được chuyển khoản thừa %s VND qua QR. Cần liên hệ hoàn trả cho khách.", 
+                    order.getOrderNumber(), df.format(overpaidAmount)));
+            notif.setType("PAYMENT_OVERPAID");
+            notif.setTargetRole("ROLE_ADMIN");
+            notif.setMetadata(String.format("{\"orderId\":%d,\"orderNumber\":\"%s\"}", order.getId(),
+                    order.getOrderNumber()));
+            notificationService.sendNotification(notif);
+        } catch (Exception e) {
+            log.error("Lỗi gửi thông báo thanh toán thừa: {}", e.getMessage(), e);
+        }
+    }
 }

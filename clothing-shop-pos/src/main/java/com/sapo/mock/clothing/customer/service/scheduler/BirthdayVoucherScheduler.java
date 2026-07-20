@@ -89,7 +89,7 @@ public class BirthdayVoucherScheduler {
      * Hàm phụ trợ kiểm tra trùng lặp theo mốc thời gian động và lưu vào DB
      */
     private void issueVoucherIfNotExist(Customer customer, Voucher voucher, Instant checkTimeLimit, Instant expiredAt) {
-        // Chỉ kiểm tra xem trong tháng này khách đã nhận voucher chưa (để sang năm khách vẫn nhận được tiếp)
+        // Kiểm tra xem trong năm nay khách đã nhận voucher sinh nhật chưa (tính từ mốc đầu năm) để ngăn lách luật đổi ngày sinh nhiều lần
         boolean alreadyIssuedThisMonth = customerVoucherRepository.existsByCustomerIdAndVoucherIdAndReceivedAtAfter(
                 customer.getId(), voucher.getId(), checkTimeLimit);
 
@@ -100,19 +100,24 @@ public class BirthdayVoucherScheduler {
             cv.setStatus(CustomerVoucherStatusEnum.UNUSED);
             cv.setReceivedAt(Instant.now());
             cv.setExpiredAt(expiredAt);
+            cv.setIssueYear(LocalDate.now().getYear());
 
-            customerVoucherRepository.save(cv);
-            log.info(">> CRM PRO SUCCESS: Đã chuyển Voucher [{}] vào ví của khách hàng: {}",
-                    voucher.getName(), customer.getFullName());
+            try {
+                customerVoucherRepository.save(cv);
+                log.info(">> CRM PRO SUCCESS: Đã chuyển Voucher [{}] vào ví của khách hàng: {}",
+                        voucher.getName(), customer.getFullName());
 
-            // Bug #17 fix: Chỉ gửi email nếu khách hàng có email hợp lệ. Không fallback sang email dev.
-            if (customer.getEmail() != null && !customer.getEmail().isBlank()) {
-                final String recipientEmail = customer.getEmail();
-                java.util.concurrent.CompletableFuture.runAsync(() -> {
-                    emailNotificationService.sendBirthdayVoucherEmail(recipientEmail, customer.getFullName(), voucher.getCode());
-                });
-            } else {
-                log.info(">> [CRM VOUCHER] Khách [{}] không có email, bỏ qua gửi mail sinh nhật.", customer.getFullName());
+                // Bug #17 fix: Chỉ gửi email nếu khách hàng có email hợp lệ. Không fallback sang email dev.
+                if (customer.getEmail() != null && !customer.getEmail().isBlank()) {
+                    final String recipientEmail = customer.getEmail();
+                    java.util.concurrent.CompletableFuture.runAsync(() -> {
+                        emailNotificationService.sendBirthdayVoucherEmail(recipientEmail, customer.getFullName(), voucher.getCode());
+                    });
+                } else {
+                    log.info(">> [CRM VOUCHER] Khách [{}] không có email, bỏ qua gửi mail sinh nhật.", customer.getFullName());
+                }
+            } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                log.warn(">> [CRM VOUCHER RACE CONDITION] Chặn cấp phát trùng Voucher sinh nhật cho khách ID: {}", customer.getId());
             }
         }
     }

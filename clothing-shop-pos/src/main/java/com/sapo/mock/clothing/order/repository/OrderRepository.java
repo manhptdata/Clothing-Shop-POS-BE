@@ -49,4 +49,10 @@ public interface OrderRepository extends JpaRepository<Order, Integer>, JpaSpeci
             @Param("end") Instant end);
 
     List<Order> findTop3ByCustomerIdOrderByCreatedAtDesc(Integer customerId);
+
+    long countByCustomerIdAndVoucherCodeAndStatusNot(Integer customerId, String voucherCode, com.sapo.mock.clothing.util.constant.OrderStatus status);
+
+    long countByCustomerIdAndStatus(Integer customerId, com.sapo.mock.clothing.util.constant.OrderStatus status);
+
+    List<Order> findByStatusAndCreatedAtBefore(com.sapo.mock.clothing.util.constant.OrderStatus status, Instant createdAt);
 }

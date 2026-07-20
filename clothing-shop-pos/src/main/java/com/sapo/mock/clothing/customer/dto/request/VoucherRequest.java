@@ -21,4 +21,18 @@ public class VoucherRequest {
     private BigDecimal maxDiscountAmount;
 
     private BigDecimal minOrderValue;
+
+    private java.time.Instant startDate;
+
+    private java.time.Instant endDate;
+
+    private Integer totalQuantity;
+
+    private Integer maxUsagePerUser = 1;
+
+    private Boolean isPublic = true;
+
+    private Integer targetCustomerGroupId;
+
+    private String applyType = "ALL";
 }

@@ -21,6 +21,9 @@ public interface CustomerVoucherRepository extends JpaRepository<CustomerVoucher
     // Kiểm tra xem khách hàng ĐÃ TỪNG nhận voucher này chưa (bất kể trạng thái hay thời gian)
     boolean existsByCustomerIdAndVoucherId(Integer customerId, Integer voucherId);
 
+    // Đếm số lần khách hàng đã nhận voucher này
+    long countByCustomerIdAndVoucherId(Integer customerId, Integer voucherId);
+
     // Lấy toàn bộ voucher của 1 khách hàng, sắp xếp mới nhất trước (dùng cho trang
     // hồ sơ chi tiết)
     List<CustomerVoucher> findByCustomerIdOrderByReceivedAtDesc(Integer customerId);
@@ -31,6 +34,13 @@ public interface CustomerVoucherRepository extends JpaRepository<CustomerVoucher
     Optional<CustomerVoucher> findUnusedVoucherByCustomerAndCodeForUpdate(
             @Param("customerId") Integer customerId,
             @Param("voucherCode") String voucherCode);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT cv FROM CustomerVoucher cv JOIN cv.voucher v WHERE cv.customer.id = :customerId AND v.code = :voucherCode AND (cv.status = 'UNUSED' OR (cv.status = 'RESERVED' AND cv.orderId = :orderId)) AND cv.expiredAt > CURRENT_TIMESTAMP")
+    Optional<CustomerVoucher> findUnusedOrReservedVoucherByCustomerAndCodeForUpdate(
+            @Param("customerId") Integer customerId,
+            @Param("voucherCode") String voucherCode,
+            @Param("orderId") Integer orderId);
 
     // Tìm voucher đã được áp dụng cho một đơn hàng cụ thể
     Optional<CustomerVoucher> findByOrderId(Integer orderId);

@@ -42,6 +42,33 @@ public class Voucher {
     @Column(length = 20, nullable = false)
     private VoucherCampaignStatusEnum status = VoucherCampaignStatusEnum.ACTIVE;
 
+    @Column(name = "start_date")
+    private Instant startDate;
+
+    @Column(name = "end_date")
+    private Instant endDate;
+
+    @Column(name = "total_quantity")
+    private Integer totalQuantity;
+
+    @Column(name = "used_quantity", nullable = false)
+    private Integer usedQuantity = 0;
+
+    @Column(name = "issued_quantity", nullable = false)
+    private Integer issuedQuantity = 0;
+
+    @Column(name = "max_usage_per_user")
+    private Integer maxUsagePerUser = 1;
+
+    @Column(name = "is_public", nullable = false)
+    private Boolean isPublic = true;
+
+    @Column(name = "target_customer_group_id")
+    private Integer targetCustomerGroupId;
+
+    @Column(name = "apply_type", length = 20, nullable = false)
+    private String applyType = "ALL";
+
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;
 

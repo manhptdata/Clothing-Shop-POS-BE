@@ -20,6 +20,7 @@ public class SystemSettingServiceImpl implements SystemSettingService {
     public static final String SETTING_PAYMENT_BANK_NAME = "PAYMENT_BANK_NAME";
     public static final String SETTING_PAYMENT_BANK_ACCOUNT = "PAYMENT_BANK_ACCOUNT";
     public static final String SETTING_PAYMENT_ACCOUNT_NAME = "PAYMENT_ACCOUNT_NAME";
+    public static final String SETTING_MAX_PENDING_ORDERS = "MAX_PENDING_ORDERS_PER_CUSTOMER";
 
     @Override
     public List<SystemSetting> getAllSettings() {
@@ -46,6 +47,8 @@ public class SystemSettingServiceImpl implements SystemSettingService {
                 newSetting.setDescription("Số tài khoản ngân hàng thụ hưởng");
             } else if (SETTING_PAYMENT_ACCOUNT_NAME.equals(key)) {
                 newSetting.setDescription("Tên chủ tài khoản ngân hàng thụ hưởng");
+            } else if (SETTING_MAX_PENDING_ORDERS.equals(key)) {
+                newSetting.setDescription("Số đơn hàng PENDING tối đa mà một khách hàng được phép sở hữu cùng lúc");
             }
             return newSetting;
         });
@@ -65,5 +68,18 @@ public class SystemSettingServiceImpl implements SystemSettingService {
         SystemSetting setting = getSettingByKey(SETTING_REQUIRE_CANCEL_APPROVAL);
         // Default is true if not configured for better security
         return setting == null || "true".equalsIgnoreCase(setting.getSettingValue());
+    }
+
+    @Override
+    public int getMaxPendingOrdersLimit() {
+        SystemSetting setting = getSettingByKey(SETTING_MAX_PENDING_ORDERS);
+        if (setting == null || setting.getSettingValue() == null || setting.getSettingValue().isBlank()) {
+            return 3; // Mặc định là 3 nếu chưa cấu hình
+        }
+        try {
+            return Integer.parseInt(setting.getSettingValue().trim());
+        } catch (NumberFormatException e) {
+            return 3;
+        }
     }
 }

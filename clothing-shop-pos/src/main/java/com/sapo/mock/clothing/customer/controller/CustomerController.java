@@ -259,4 +259,20 @@ public class CustomerController {
                     .body(Map.of("message", "Import thất bại: " + e.getMessage()));
         }
     }
+
+    @DeleteMapping("/vouchers/{customerVoucherId}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'MANAGE_CUSTOMER')")
+    public ResponseEntity<RestResponse<Void>> revokeCustomerVoucher(@PathVariable Integer customerVoucherId) {
+        customerService.revokeCustomerVoucher(customerVoucherId);
+        RestResponse<Void> response = new RestResponse<>(HttpStatus.OK.value(), null, "Thu hồi voucher khỏi ví thành công", null);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{customerId}/vouchers/{voucherId}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'MANAGE_CUSTOMER')")
+    public ResponseEntity<RestResponse<Void>> giveCustomerVoucher(@PathVariable Integer customerId, @PathVariable Integer voucherId) {
+        customerService.giveCustomerVoucher(customerId, voucherId);
+        RestResponse<Void> response = new RestResponse<>(HttpStatus.OK.value(), null, "Tặng voucher cho khách hàng thành công", null);
+        return ResponseEntity.ok(response);
+    }
 }

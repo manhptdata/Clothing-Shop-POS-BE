@@ -36,23 +36,22 @@ public class CustomerGroupListener {
         Customer customer = customerRepository.findByIdWithPessimisticLock(event.getCustomerId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy khách hàng khi xử lý nâng hạng tự động"));
 
-        // 2. Cộng dồn doanh số mua hàng mới
+        // 2. Cộng dồn doanh số mua hàng mới (hoặc trừ đi nếu trả hàng)
         BigDecimal currentSpent = customer.getTotalSpent() != null ? customer.getTotalSpent() : BigDecimal.ZERO;
         BigDecimal newTotalSpent = currentSpent.add(event.getOrderAmount());
         customer.setTotalSpent(newTotalSpent);
 
-        // Gọi hàm bốc về List và truyền kèm trạng thái CustomerStatusEnum.ACTIVE
+        // 3. Gọi hàm bốc về List các nhóm phù hợp với newTotalSpent
         List<CustomerGroup> suitableGroups = customerGroupRepository.findSuitableGroup(
                 newTotalSpent,
                 CustomerStatusEnum.ACTIVE
         );
 
-        // Bốc ra phần tử đầu tiên tìm được (Hạng cao nhất thỏa mãn nhờ lệnh ORDER BY ở Repo), nếu List rỗng thì trả về null
-        CustomerGroup suitableGroup = suitableGroups.isEmpty() ? 
-                customerGroupRepository.findFirstByStatusOrderByMinSpendingAsc(CustomerStatusEnum.ACTIVE).orElse(null) 
-                : suitableGroups.get(0);
+        // Bốc ra phần tử đầu tiên tìm được (Hạng cao nhất thỏa mãn nhờ lệnh ORDER BY ở Repo).
+        // Nếu List rỗng (chưa đạt mốc minSpending của bất kỳ hạng nào), trả về null (không có hạng)
+        CustomerGroup suitableGroup = suitableGroups.isEmpty() ? null : suitableGroups.get(0);
 
-        // 4. Cập nhật nhóm mới tự động
+        // 4. Cập nhật nhóm mới tự động (Hỗ trợ cả nâng hạng lẫn hạ hạng ngay khi totalSpent thay đổi)
         customer.setCustomerGroup(suitableGroup);
         customerRepository.saveAndFlush(customer);
     }
