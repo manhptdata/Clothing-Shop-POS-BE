@@ -120,9 +120,23 @@ public class PaymentController {
             throw new BadRequestException("Chỉ có thể hoàn tiền cho giao dịch chuyển trùng, chuyển thừa hoặc chuyển thiếu");
         }
 
-        log.setStatus("REFUNDED");
+        BigDecimal actualRefund = refundAmount != null ? refundAmount : log.getTransferAmount();
 
-        String amountStr = refundAmount != null ? refundAmount.toPlainString() : "Toàn bộ";
+        if (actualRefund != null && log.getTransferAmount() != null) {
+            if (actualRefund.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new BadRequestException("Số tiền hoàn phải lớn hơn 0");
+            }
+            if (actualRefund.compareTo(log.getTransferAmount()) > 0) {
+                throw new BadRequestException("Số tiền hoàn (" + actualRefund + ") không được lớn hơn tổng số tiền khách đã chuyển (" + log.getTransferAmount() + ")");
+            }
+        }
+
+        log.setStatus("REFUNDED");
+        log.setRefundAmount(actualRefund);
+        log.setRefundedAt(java.time.Instant.now());
+        log.setRefundedBy(com.sapo.mock.clothing.util.SecurityUtil.getCurrentUserLogin().orElse("KhongXacDinh"));
+
+        String amountStr = actualRefund != null ? actualRefund.toPlainString() : "Toàn bộ";
         String extraNote = " | [Đã hoàn tiền mặt: " + amountStr + " VND]";
         log.setContent(log.getContent() != null ? log.getContent() + extraNote : extraNote);
 

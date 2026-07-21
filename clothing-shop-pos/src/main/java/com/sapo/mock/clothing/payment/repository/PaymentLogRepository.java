@@ -13,8 +13,13 @@ import java.util.Optional;
 @Repository
 public interface PaymentLogRepository extends JpaRepository<PaymentLog, Integer>, JpaSpecificationExecutor<PaymentLog> {
     boolean existsByReferenceCode(String referenceCode);
+
+    boolean existsByOrderNumberAndStatus(String orderNumber, String status);
     
     Optional<PaymentLog> findByReferenceCode(String referenceCode);
+
+    @Query("SELECT COALESCE(SUM(p.refundAmount), 0) FROM PaymentLog p WHERE p.refundedBy = :username AND p.refundedAt >= :start AND p.status = 'REFUNDED'")
+    java.math.BigDecimal calculateTotalRefundByUsernameSince(@Param("username") String username, @Param("start") java.time.Instant start);
 
     @Modifying
     @Transactional

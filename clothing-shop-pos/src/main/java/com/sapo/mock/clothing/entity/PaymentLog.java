@@ -49,6 +49,15 @@ public class PaymentLog {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "refund_amount", precision = 15, scale = 2)
+    private BigDecimal refundAmount;
+
+    @Column(name = "refunded_at")
+    private Instant refundedAt;
+
+    @Column(name = "refunded_by", length = 50)
+    private String refundedBy;
+
     @PrePersist
     public void prePersist() {
         this.createdAt = Instant.now();

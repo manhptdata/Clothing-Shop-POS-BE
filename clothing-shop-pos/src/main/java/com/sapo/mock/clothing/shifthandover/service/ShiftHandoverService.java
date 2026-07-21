@@ -22,10 +22,13 @@ public class ShiftHandoverService {
     private final ShiftHandoverRepository shiftHandoverRepository;
     private final NotificationService notificationService;
     private final OrderRepository orderRepository;
+    private final com.sapo.mock.clothing.payment.repository.PaymentLogRepository paymentLogRepository;
 
     public BigDecimal getUserRevenueToday(String username) {
         Instant start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant();
-        return orderRepository.calculateUserRevenueToday(username, start);
+        BigDecimal orderRevenue = orderRepository.calculateUserRevenueToday(username, start);
+        BigDecimal sepayRefunds = paymentLogRepository.calculateTotalRefundByUsernameSince(username, start);
+        return orderRevenue.subtract(sepayRefunds);
     }
 
     @Transactional
