@@ -65,7 +65,7 @@ public class OrderLoyaltyService {
 
         if (appliedWalletVoucher != null) {
             voucher = appliedWalletVoucher.getVoucher();
-            if (appliedWalletVoucher.getExpiredAt().isBefore(Instant.now())) {
+            if (!isSamePublicVoucher && appliedWalletVoucher.getExpiredAt().isBefore(Instant.now())) {
                 throw new BadRequestException("Voucher này trong ví của bạn đã hết hạn");
             }
         } else {
@@ -95,7 +95,7 @@ public class OrderLoyaltyService {
                 throw new BadRequestException("Chương trình voucher chưa tới thời gian áp dụng");
             }
 
-            if (voucher.getEndDate() != null && now.isAfter(voucher.getEndDate())) {
+            if (!isSamePublicVoucher && voucher.getEndDate() != null && now.isAfter(voucher.getEndDate())) {
                 throw new BadRequestException("Mã voucher đã hết hạn sử dụng");
             }
 

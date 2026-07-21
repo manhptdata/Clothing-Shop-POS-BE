@@ -74,7 +74,8 @@ public class SePayWebhookController {
                 java.util.Optional<PaymentLog> existingLog = paymentLogRepository.findByReferenceCode(request.getReferenceCode());
                 if (existingLog.isPresent()) {
                     String existingStatus = existingLog.get().getStatus();
-                    if ("SUCCESS".equals(existingStatus) || "PROCESSING".equals(existingStatus) || "INSUFFICIENT".equals(existingStatus)) {
+                    if ("SUCCESS".equals(existingStatus) || "PROCESSING".equals(existingStatus) || "INSUFFICIENT".equals(existingStatus) 
+                            || "OVERPAID".equals(existingStatus) || "DUPLICATE_PAYMENT".equals(existingStatus)) {
                         log.info("Webhook trùng lặp (referenceCode={}, status={}), bỏ qua.", request.getReferenceCode(), existingStatus);
                         return ResponseEntity.ok(Map.of("success", true));
                     }
@@ -112,9 +113,10 @@ public class SePayWebhookController {
                     String status = orderService.completeOrderPayment(orderNumber, request.getTransferAmount());
                     log.info("Thanh toán {} cho đơn hàng: {}", status, orderNumber);
                     paymentLogRepository.updateByReferenceCode(request.getReferenceCode(), status, orderNumber);
-                } catch (com.sapo.mock.clothing.exception.DuplicatePaymentException e) {
-                    log.warn("Thanh toán trùng lặp cho đơn hàng {}: {}", orderNumber, e.getMessage());
-                    paymentLogRepository.updateByReferenceCode(request.getReferenceCode(), "DUPLICATE_PAYMENT", orderNumber);
+                } catch (com.sapo.mock.clothing.exception.ResourceNotFoundException e) {
+                    log.warn("Không tìm thấy đơn hàng {} từ webhook, đánh dấu NO_ORDER", orderNumber);
+                    paymentLogRepository.updateByReferenceCode(request.getReferenceCode(), "NO_ORDER", orderNumber);
+                    return ResponseEntity.ok(Map.of("success", true));
                 } catch (Exception e) {
                     // Lỗi hệ thống (DB lỗi, timeout) -> Trả 500 để SePay retry
                     log.error("Lỗi hệ thống xử lý thanh toán đơn hàng {}: {}", orderNumber, e.getMessage(), e);
