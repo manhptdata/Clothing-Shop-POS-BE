@@ -91,4 +91,21 @@ public class OrderNotificationHelper {
             log.error("Lỗi gửi thông báo thanh toán thừa: {}", e.getMessage(), e);
         }
     }
+
+    public void sendDuplicatePaymentNotification(Order order, BigDecimal paidAmount) {
+        try {
+            DecimalFormat df = new DecimalFormat("#,###", new DecimalFormatSymbols(Locale.US));
+            Notification notif = new Notification();
+            notif.setTitle("Thanh toán trùng lặp (SePay)");
+            notif.setMessage(String.format("CẢNH BÁO: Đơn hàng %s vừa nhận thêm khoản chuyển khoản %s VND dù đã hoàn tất/hủy. Vui lòng đối soát và hoàn tiền cho khách.", 
+                    order.getOrderNumber(), df.format(paidAmount)));
+            notif.setType("PAYMENT_DUPLICATED");
+            notif.setTargetRole("ROLE_ADMIN");
+            notif.setMetadata(String.format("{\"orderId\":%d,\"orderNumber\":\"%s\"}", order.getId(),
+                    order.getOrderNumber()));
+            notificationService.sendNotification(notif);
+        } catch (Exception e) {
+            log.error("Lỗi gửi thông báo thanh toán trùng lặp: {}", e.getMessage(), e);
+        }
+    }
 }

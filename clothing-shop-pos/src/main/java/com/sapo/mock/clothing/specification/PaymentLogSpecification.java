@@ -9,7 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class PaymentLogSpecification {
-    public static Specification<PaymentLog> filterLogs(String orderNumber, String status, String startDate, String endDate) {
+    public static Specification<PaymentLog> filterLogs(String orderNumber, String status, String gateway, String startDate, String endDate) {
         return (root, query, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
 
@@ -18,6 +18,9 @@ public class PaymentLogSpecification {
             }
             if (StringUtils.hasText(status)) {
                 predicates.add(criteriaBuilder.equal(root.get("status"), status));
+            }
+            if (StringUtils.hasText(gateway)) {
+                predicates.add(criteriaBuilder.equal(root.get("gateway"), gateway));
             }
             if (StringUtils.hasText(startDate)) {
                 String start = startDate.length() == 10 ? startDate + " 00:00:00" : startDate;

@@ -1,5 +1,6 @@
 package com.sapo.mock.clothing.product.service;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -311,6 +312,10 @@ public class ProductService implements IProductService {
 				// Cố tình không gọi variant.setImportPrice(...) ở đây để bảo toàn giá cũ
 			}
 
+			BigDecimal finalImportPrice = vReq.getImportPrice() != null ? vReq.getImportPrice() : variant.getImportPrice();
+			if (vReq.getSalePrice() != null && finalImportPrice != null && vReq.getSalePrice().compareTo(finalImportPrice) < 0) {
+				throw new BadRequestException("Giá bán lẻ (" + vReq.getSalePrice() + ") không được nhỏ hơn giá vốn (" + finalImportPrice + ") đối với SKU: " + finalSku);
+			}
 			variant.setSalePrice(vReq.getSalePrice());
 			variant.setLowStockThreshold(vReq.getLowStockThreshold() != null ? vReq.getLowStockThreshold() : 5);
 

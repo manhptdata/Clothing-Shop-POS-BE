@@ -51,6 +51,12 @@ public class SePayWebhookController {
                 request.getReferenceCode(), request.getTransferAmount(), request.getTransferType());
 
         // Kiểm tra Token bảo mật (Apikey hoặc Bearer Token)
+        if (webhookToken == null || webhookToken.isBlank()) {
+            log.error("⚠️ SEPAY_WEBHOOK_TOKEN chưa được cấu hình! Từ chối xử lý Webhook.");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("success", false, "message", "Webhook token is not configured"));
+        }
+
         String expectedApikeyHeader = "Apikey " + webhookToken;
         String expectedBearerHeader = "Bearer " + webhookToken;
         if (authHeader == null
@@ -75,7 +81,12 @@ public class SePayWebhookController {
                     // Status = ERROR hoặc NO_ORDER -> cho phép xử lý lại
                     paymentLogRepository.updateByReferenceCode(request.getReferenceCode(), "PROCESSING", null);
                 } else {
-                    savePaymentLog(request, null, "PROCESSING");
+                    try {
+                        savePaymentLog(request, null, "PROCESSING");
+                    } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                        log.info("Webhook trùng lặp (referenceCode={}) do concurrent request, bỏ qua.", request.getReferenceCode());
+                        return ResponseEntity.ok(Map.of("success", true));
+                    }
                 }
             }
 
@@ -101,6 +112,9 @@ public class SePayWebhookController {
                     orderService.completeOrderPayment(orderNumber, request.getTransferAmount());
                     log.info("Thanh toán thành công cho đơn hàng: {}", orderNumber);
                     paymentLogRepository.updateByReferenceCode(request.getReferenceCode(), "SUCCESS", orderNumber);
+                } catch (com.sapo.mock.clothing.exception.DuplicatePaymentException e) {
+                    log.warn("Thanh toán trùng lặp cho đơn hàng {}: {}", orderNumber, e.getMessage());
+                    paymentLogRepository.updateByReferenceCode(request.getReferenceCode(), "DUPLICATE_PAYMENT", orderNumber);
                 } catch (BadRequestException e) {
                     // Lỗi nghiệp vụ (chuyển thiếu tiền, đơn không pending)
                     log.warn("Lỗi nghiệp vụ xử lý thanh toán đơn hàng {}: {}", orderNumber, e.getMessage());
@@ -123,18 +137,14 @@ public class SePayWebhookController {
     }
 
     private void savePaymentLog(SePayWebhookRequest request, String orderNumber, String status) {
-        try {
-            PaymentLog paymentLog = new PaymentLog();
-            paymentLog.setReferenceCode(request.getReferenceCode());
-            paymentLog.setOrderNumber(orderNumber);
-            paymentLog.setTransferAmount(request.getTransferAmount());
-            paymentLog.setGateway(request.getGateway());
-            paymentLog.setTransactionDate(request.getTransactionDate());
-            paymentLog.setContent(request.getContent());
-            paymentLog.setStatus(status);
-            paymentLogRepository.save(paymentLog);
-        } catch (Exception e) {
-            log.error("Lỗi khi lưu PaymentLog cho referenceCode={}: {}", request.getReferenceCode(), e.getMessage());
-        }
+        PaymentLog paymentLog = new PaymentLog();
+        paymentLog.setReferenceCode(request.getReferenceCode());
+        paymentLog.setOrderNumber(orderNumber);
+        paymentLog.setTransferAmount(request.getTransferAmount());
+        paymentLog.setGateway(request.getGateway());
+        paymentLog.setTransactionDate(request.getTransactionDate());
+        paymentLog.setContent(request.getContent());
+        paymentLog.setStatus(status);
+        paymentLogRepository.save(paymentLog);
     }
 }

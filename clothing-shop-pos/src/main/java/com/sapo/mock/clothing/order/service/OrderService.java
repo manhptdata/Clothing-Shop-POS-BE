@@ -63,15 +63,23 @@ public class OrderService {
         User createdBy = getUserByUsername(username);
         Customer customer = getCustomerById(dto.getCustomerId());
 
-        // Chặn giam kho: Giới hạn số đơn PENDING tối đa per customer (Cài đặt động trong SystemSetting)
+        // Chặn giam kho: Giới hạn số đơn PENDING tối đa per customer (Cài đặt động
+        // trong SystemSetting)
         if (customer != null && customer.getId() != null && customer.getId() != 1) {
             int maxPending = systemSettingService.getMaxPendingOrdersLimit();
             long currentPending = orderRepository.countByCustomerIdAndStatus(customer.getId(), OrderStatus.PENDING);
             if (currentPending >= maxPending) {
-                throw new BadRequestException("Khách hàng đang có " + currentPending 
-                        + " đơn hàng chưa thanh toán (Tối đa cho phép là " + maxPending + " đơn). Vui lòng hoàn tất hoặc hủy các đơn cũ trước khi tạo đơn mới.");
+                throw new BadRequestException("Khách hàng đang có " + currentPending
+                        + " đơn hàng chưa thanh toán (Tối đa cho phép là " + maxPending
+                        + " đơn). Vui lòng hoàn tất hoặc hủy các đơn cũ trước khi tạo đơn mới.");
             }
         }
+
+        // Bug #5 fix: Không cho tạo đơn hàng rỗng
+        if (dto.getItems() == null || dto.getItems().isEmpty()) {
+            throw new BadRequestException("Đơn hàng phải có ít nhất 1 sản phẩm");
+        }
+        mergeDuplicateItems(dto);
 
         Order order = new Order();
         initOrderInfo(order, dto, customer, createdBy);
@@ -79,11 +87,6 @@ public class OrderService {
         String dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String timeStr = java.time.LocalTime.now().format(DateTimeFormatter.ofPattern("HHmmssSSS"));
         order.setOrderNumber("HD-" + dateStr + "-" + timeStr);
-
-        // Bug #5 fix: Không cho tạo đơn hàng rỗng
-        if (dto.getItems() == null || dto.getItems().isEmpty()) {
-            throw new BadRequestException("Đơn hàng phải có ít nhất 1 sản phẩm");
-        }
 
         List<OrderLineItem> lineItems = new ArrayList<>();
         BigDecimal totalAmount = buildOrderItems(dto.getItems(), order, lineItems);
@@ -99,7 +102,8 @@ public class OrderService {
         Order savedOrder = orderRepository.save(order);
         orderLineItemRepository.saveAll(lineItems);
 
-        // Truyền orderNumber và savedOrder.getId() thật vào deductProductStock để ghi StockLog
+        // Truyền orderNumber và savedOrder.getId() thật vào deductProductStock để ghi
+        // StockLog
         orderInventoryService.deductProductStock(dto.getItems(), savedOrder.getId(), savedOrder.getOrderNumber());
 
         if (order.getStatus() == OrderStatus.PENDING) {
@@ -128,7 +132,8 @@ public class OrderService {
 
     public Order getOrderEntityByOrderNumber(String orderNumber) {
         return orderRepository.findByOrderNumber(orderNumber)
-                .orElseThrow(() -> new com.sapo.mock.clothing.exception.ResourceNotFoundException("Đơn hàng không tồn tại: " + orderNumber));
+                .orElseThrow(() -> new com.sapo.mock.clothing.exception.ResourceNotFoundException(
+                        "Đơn hàng không tồn tại: " + orderNumber));
     }
 
     // Lấy danh sách đơn hàng
@@ -161,13 +166,27 @@ public class OrderService {
     @Transactional
     public ResOrderDTO updateOrder(Integer id, ReqCreateOrderDTO dto, String username) {
         User createdBy = getUserByUsername(username);
-        Order order = getOrderEntityById(id);
+        Order order = orderRepository.findByIdWithPessimisticLock(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Đơn hàng ID " + id + " không tồn tại"));
 
         if (order.getStatus() != OrderStatus.PENDING) {
-            throw new BadRequestException("Chỉ có thể cập nhật đơn hàng ở trạng thái Đang xử lý");
+            throw new BadRequestException(
+                    "Không thể cập nhật: Đơn hàng đã được thanh toán thành công trong lúc bạn đang thao tác.");
         }
 
         Customer customer = getCustomerById(dto.getCustomerId());
+        Customer oldCustomer = getCustomerById(order.getCustomerId());
+        boolean isCustomerChanged = !oldCustomer.getId().equals(customer.getId());
+
+        if (isCustomerChanged && customer.getId() != 1) {
+            int maxPending = systemSettingService.getMaxPendingOrdersLimit();
+            long currentPending = orderRepository.countByCustomerIdAndStatus(customer.getId(), OrderStatus.PENDING);
+            if (currentPending >= maxPending) {
+                throw new BadRequestException("Khách hàng được chọn đang có " + currentPending
+                        + " đơn hàng chưa thanh toán (Tối đa cho phép là " + maxPending
+                        + " đơn). Vui lòng hoàn tất hoặc hủy các đơn cũ trước khi chuyển đơn cho khách hàng này.");
+            }
+        }
 
         List<OrderLineItem> oldItems = orderLineItemRepository.findByOrderId(id);
         orderInventoryService.restoreProductStock(oldItems, id, order.getOrderNumber());
@@ -175,23 +194,29 @@ public class OrderService {
 
         String oldVoucherCode = order.getVoucherCode();
         String newVoucherCode = dto.getVoucherCode();
-        boolean isSamePublicVoucher = oldVoucherCode != null && !oldVoucherCode.isBlank()
+        boolean isSamePublicVoucher = !isCustomerChanged && oldVoucherCode != null && !oldVoucherCode.isBlank()
                 && oldVoucherCode.trim().equalsIgnoreCase(newVoucherCode != null ? newVoucherCode.trim() : "");
 
-        // Hoàn trả Loyalty (Điểm & Voucher) của đơn PENDING cũ trước khi tính toán áp dụng lại (giữ slot nếu mã không đổi)
-        orderLoyaltyService.revertLoyaltyOnUpdate(order, customer, newVoucherCode);
-
-        initOrderInfo(order, dto, customer, createdBy);
+        // Hoàn trả Loyalty (Điểm & Voucher) của đơn PENDING cũ trước khi tính toán áp dụng lại
+        if (isCustomerChanged) {
+            orderLoyaltyService.revertLoyaltyOnCancel(order, oldCustomer);
+        } else {
+            orderLoyaltyService.revertLoyaltyOnUpdate(order, oldCustomer, newVoucherCode);
+        }
 
         // Bug #5 fix: Không cho cập nhật đơn hàng thành rỗng
         if (dto.getItems() == null || dto.getItems().isEmpty()) {
             throw new BadRequestException("Đơn hàng phải có ít nhất 1 sản phẩm");
         }
+        mergeDuplicateItems(dto);
+
+        initOrderInfo(order, dto, customer, createdBy);
 
         List<OrderLineItem> lineItems = new ArrayList<>();
         BigDecimal totalAmount = buildOrderItems(dto.getItems(), order, lineItems);
 
-        CustomerVoucher appliedVoucher = orderLoyaltyService.applyVoucher(dto, order, customer, totalAmount, isSamePublicVoucher);
+        CustomerVoucher appliedVoucher = orderLoyaltyService.applyVoucher(dto, order, customer, totalAmount,
+                isSamePublicVoucher);
         totalAmount = totalAmount.subtract(order.getDiscountFromVoucher());
 
         orderLoyaltyService.applyPoints(dto, order, customer, totalAmount);
@@ -209,6 +234,11 @@ public class OrderService {
             eventPublisher
                     .publishEvent(new OrderCompletedEvent(savedOrder.getCustomerId(), savedOrder.getTotalAmount()));
             orderNotificationHelper.sendOrderNotifications(savedOrder, dto.getPaymentMethod());
+        } else if (order.getStatus() == OrderStatus.PENDING) {
+            if (appliedVoucher != null) {
+                orderLoyaltyService.reserveVoucher(appliedVoucher, savedOrder.getId());
+            }
+            orderLoyaltyService.reservePoints(savedOrder, customer);
         }
 
         return mapToResOrderDTO(savedOrder, lineItems);
@@ -220,14 +250,15 @@ public class OrderService {
         Order order = orderRepository.findByIdWithPessimisticLock(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Đơn hàng ID " + id + " không tồn tại"));
 
-        if (order.getStatus() != OrderStatus.PENDING && systemSettingService.isCancelApprovalRequired()) {
+        if (systemSettingService.isCancelApprovalRequired()) {
             if (dto.getApprovalPin() == null || dto.getApprovalPin().isEmpty()) {
                 throw new BadRequestException("Cần có mã PIN quản lý để duyệt hủy đơn hàng.");
             }
 
             // Kiểm tra PIN
             List<User> approvers = userRepository.findAll().stream()
-                    .filter(u -> "ROLE_ADMIN".equals(u.getRole().getName()) || "ROLE_MANAGER".equals(u.getRole().getName()))
+                    .filter(u -> "ROLE_ADMIN".equals(u.getRole().getName())
+                            || "ROLE_MANAGER".equals(u.getRole().getName()))
                     .filter(u -> u.getSecurityPin() != null && u.getSecurityPin().equals(dto.getApprovalPin()))
                     .toList();
 
@@ -254,13 +285,8 @@ public class OrderService {
 
         Customer customer = getCustomerById(order.getCustomerId());
 
-        if (previousStatus == OrderStatus.COMPLETED || previousStatus == OrderStatus.PENDING) {
+        if (previousStatus == OrderStatus.PENDING) {
             orderLoyaltyService.revertLoyaltyOnCancel(savedOrder, customer);
-        }
-
-        if (previousStatus == OrderStatus.COMPLETED) {
-            // Bắn sự kiện trừ doanh số âm để trừ totalSpent và tính lại hạng cho khách hàng
-            eventPublisher.publishEvent(new OrderCompletedEvent(savedOrder.getCustomerId(), savedOrder.getTotalAmount().negate()));
         }
 
         List<OrderLineItem> items = orderLineItemRepository.findByOrderId(id);
@@ -272,7 +298,8 @@ public class OrderService {
     // Đánh dấu đơn hàng đã in
     @Transactional
     public ResOrderDTO updatePrintStatus(Integer id, boolean status) {
-        Order order = getOrderEntityById(id);
+        Order order = orderRepository.findByIdWithPessimisticLock(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Đơn hàng ID " + id + " không tồn tại"));
         order.setPrinted(status);
         orderRepository.save(order);
         return mapToResOrderDTO(order, orderLineItemRepository.findByOrderId(id));
@@ -309,9 +336,23 @@ public class OrderService {
         order.setCreatedBy(createdBy.getId());
         order.setCreatedByUsername(createdBy.getUsername());
         order.setNote(dto.getNote());
-        order.setPaidAmount(dto.getPaidAmount() != null ? dto.getPaidAmount() : BigDecimal.ZERO);
-        order.setStatus(dto.getStatus() != null ? dto.getStatus() : OrderStatus.COMPLETED);
-        order.setPaymentMethod(dto.getPaymentMethod() != null ? PaymentMethod.valueOf(dto.getPaymentMethod()) : PaymentMethod.CASH);
+
+        PaymentMethod pm = dto.getPaymentMethod() != null ? PaymentMethod.valueOf(dto.getPaymentMethod())
+                : PaymentMethod.CASH;
+        order.setPaymentMethod(pm);
+
+        if (pm == PaymentMethod.QR_SEPAY) {
+            order.setStatus(OrderStatus.PENDING);
+            order.setPaidAmount(BigDecimal.ZERO);
+        } else {
+            order.setPaidAmount(dto.getPaidAmount() != null ? dto.getPaidAmount() : BigDecimal.ZERO);
+            OrderStatus requestedStatus = dto.getStatus();
+            if (requestedStatus != null && requestedStatus != OrderStatus.COMPLETED && requestedStatus != OrderStatus.PENDING) {
+                throw new BadRequestException("Trạng thái đơn hàng không hợp lệ. Chỉ được phép tạo/cập nhật ở trạng thái PENDING hoặc COMPLETED.");
+            }
+            order.setStatus(requestedStatus != null ? requestedStatus : OrderStatus.COMPLETED);
+        }
+
         if (order.getId() == null)
             order.setPrinted(false);
     }
@@ -383,7 +424,9 @@ public class OrderService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng: " + orderNumber));
 
         if (order.getStatus() != OrderStatus.PENDING) {
-            return;
+            orderNotificationHelper.sendDuplicatePaymentNotification(order, paidAmount);
+            throw new com.sapo.mock.clothing.exception.DuplicatePaymentException(
+                    "Đơn hàng đã được thanh toán hoặc không ở trạng thái chờ thanh toán.");
         }
 
         if (paidAmount.compareTo(order.getTotalAmount()) < 0) {
@@ -394,11 +437,12 @@ public class OrderService {
         order.setStatus(OrderStatus.COMPLETED);
         order.setPaymentMethod(PaymentMethod.QR_SEPAY);
         order.setPaidAmount(paidAmount);
-        
+
         BigDecimal overpaid = paidAmount.subtract(order.getTotalAmount());
-        // Tiền thối chỉ áp dụng cho TIỀN MẶT. Khóa changeAmount = 0 cho QR_SEPAY để tránh thất thoát tiền mặt.
+        // Tiền thối chỉ áp dụng cho TIỀN MẶT. Khóa changeAmount = 0 cho QR_SEPAY để
+        // tránh thất thoát tiền mặt.
         order.setChangeAmount(BigDecimal.ZERO);
-        
+
         if (overpaid.compareTo(BigDecimal.ZERO) > 0) {
             orderNotificationHelper.sendOverpaymentNotification(order, overpaid);
         }
@@ -415,7 +459,8 @@ public class OrderService {
         orderNotificationHelper.sendOrderNotifications(savedOrder, "QR_SEPAY");
     }
 
-    // Hoàn thành thanh toán đơn hàng bằng ID (sử dụng cho luồng POS thủ công/online tối giản)
+    // Hoàn thành thanh toán đơn hàng bằng ID (sử dụng cho luồng POS thủ công/online
+    // tối giản)
     @Transactional
     public ResOrderDTO completeOrderPaymentById(Integer id, String paymentMethod, BigDecimal paidAmount) {
         Order order = orderRepository.findByIdWithPessimisticLock(id)
@@ -444,17 +489,18 @@ public class OrderService {
         Order savedOrder = orderRepository.save(order);
         Customer customer = getCustomerById(savedOrder.getCustomerId());
         CustomerVoucher appliedVoucher = orderLoyaltyService.getAppliedVoucher(savedOrder.getId());
-        
+
         orderLoyaltyService.processLoyaltyOnCompletion(savedOrder, customer, appliedVoucher);
         eventPublisher.publishEvent(new OrderCompletedEvent(savedOrder.getCustomerId(), savedOrder.getTotalAmount()));
-        
+
         if ("QR_SEPAY".equals(paymentMethod)) {
             PaymentLog paymentLog = new PaymentLog();
             paymentLog.setReferenceCode("MANUAL_" + System.currentTimeMillis());
             paymentLog.setOrderNumber(savedOrder.getOrderNumber());
             paymentLog.setTransferAmount(amount);
             paymentLog.setGateway("MANUAL");
-            paymentLog.setTransactionDate(java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            paymentLog.setTransactionDate(java.time.LocalDateTime.now()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             paymentLog.setContent("Thanh toán QR được xác nhận thủ công cho đơn " + savedOrder.getOrderNumber());
             paymentLog.setStatus("SUCCESS");
             paymentLogRepository.save(paymentLog);
@@ -466,7 +512,8 @@ public class OrderService {
     }
 
     private BigDecimal getVoucherMinOrderValue(Order order) {
-        if (order.getVoucherCode() == null) return null;
+        if (order.getVoucherCode() == null)
+            return null;
         return customerVoucherRepository.findByOrderIdWithVoucher(order.getId())
                 .map(cv -> cv.getVoucher() != null ? cv.getVoucher().getMinOrderValue() : null)
                 .orElse(null);
@@ -510,5 +557,29 @@ public class OrderService {
                 .updatedAt(savedOrder.getUpdatedAt())
                 .items(resItems)
                 .build();
+    }
+
+    private void mergeDuplicateItems(ReqCreateOrderDTO dto) {
+        if (dto.getItems() == null || dto.getItems().isEmpty()) {
+            return;
+        }
+        Map<Integer, Long> groupedItems = new java.util.LinkedHashMap<>();
+        for (ReqCreateOrderDTO.OrderItemDTO itemDto : dto.getItems()) {
+            if (itemDto.getVariantId() != null && itemDto.getQuantity() != null) {
+                long newQty = groupedItems.getOrDefault(itemDto.getVariantId(), 0L) + itemDto.getQuantity();
+                if (newQty > Integer.MAX_VALUE) {
+                    throw new BadRequestException("Tổng số lượng cho một sản phẩm đã vượt quá giới hạn hệ thống.");
+                }
+                groupedItems.put(itemDto.getVariantId(), newQty);
+            }
+        }
+        List<ReqCreateOrderDTO.OrderItemDTO> mergedItems = new ArrayList<>();
+        for (Map.Entry<Integer, Long> entry : groupedItems.entrySet()) {
+            ReqCreateOrderDTO.OrderItemDTO mergedItem = new ReqCreateOrderDTO.OrderItemDTO();
+            mergedItem.setVariantId(entry.getKey());
+            mergedItem.setQuantity(entry.getValue().intValue());
+            mergedItems.add(mergedItem);
+        }
+        dto.setItems(mergedItems);
     }
 }

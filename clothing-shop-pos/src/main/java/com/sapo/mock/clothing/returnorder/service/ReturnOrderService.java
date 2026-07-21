@@ -370,7 +370,7 @@ public class ReturnOrderService {
             customerRepository.save(lockedCustomer);
 
             // Gửi sự kiện cập nhật tổng chi tiêu (event với số tiền âm) để recheck nâng/hạ hạng tự động
-            eventPublisher.publishEvent(new OrderCompletedEvent(lockedCustomer.getId(), computedRefundAmount.negate()));
+            eventPublisher.publishEvent(new OrderCompletedEvent(lockedCustomer.getId(), unpenalizedCurrentRefund.negate()));
         }
 
         returnOrder.setTotalRefundAmount(computedRefundAmount);
