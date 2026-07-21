@@ -77,8 +77,12 @@ public class PaymentController {
             throw new BadRequestException("Đơn hàng không ở trạng thái chờ thanh toán");
         }
 
-        BigDecimal amount = order.getTotalAmount();
-
+        BigDecimal paidAmount = order.getPaidAmount() != null ? order.getPaidAmount() : BigDecimal.ZERO;
+        BigDecimal amount = order.getTotalAmount().subtract(paidAmount);
+        
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Đơn hàng này đã được thanh toán đủ");
+        }
         SystemSetting bankNameSetting = systemSettingService.getSettingByKey(SystemSettingServiceImpl.SETTING_PAYMENT_BANK_NAME);
         SystemSetting bankAccountSetting = systemSettingService.getSettingByKey(SystemSettingServiceImpl.SETTING_PAYMENT_BANK_ACCOUNT);
         SystemSetting accountNameSetting = systemSettingService.getSettingByKey(SystemSettingServiceImpl.SETTING_PAYMENT_ACCOUNT_NAME);
