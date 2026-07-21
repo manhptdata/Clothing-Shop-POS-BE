@@ -109,16 +109,12 @@ public class SePayWebhookController {
                 }
 
                 try {
-                    orderService.completeOrderPayment(orderNumber, request.getTransferAmount());
-                    log.info("Thanh toán thành công cho đơn hàng: {}", orderNumber);
-                    paymentLogRepository.updateByReferenceCode(request.getReferenceCode(), "SUCCESS", orderNumber);
+                    String status = orderService.completeOrderPayment(orderNumber, request.getTransferAmount());
+                    log.info("Thanh toán {} cho đơn hàng: {}", status, orderNumber);
+                    paymentLogRepository.updateByReferenceCode(request.getReferenceCode(), status, orderNumber);
                 } catch (com.sapo.mock.clothing.exception.DuplicatePaymentException e) {
                     log.warn("Thanh toán trùng lặp cho đơn hàng {}: {}", orderNumber, e.getMessage());
                     paymentLogRepository.updateByReferenceCode(request.getReferenceCode(), "DUPLICATE_PAYMENT", orderNumber);
-                } catch (BadRequestException e) {
-                    // Lỗi nghiệp vụ (chuyển thiếu tiền, đơn không pending)
-                    log.warn("Lỗi nghiệp vụ xử lý thanh toán đơn hàng {}: {}", orderNumber, e.getMessage());
-                    paymentLogRepository.updateByReferenceCode(request.getReferenceCode(), "INSUFFICIENT", orderNumber);
                 } catch (Exception e) {
                     // Lỗi hệ thống (DB lỗi, timeout) -> Trả 500 để SePay retry
                     log.error("Lỗi hệ thống xử lý thanh toán đơn hàng {}: {}", orderNumber, e.getMessage(), e);
