@@ -245,13 +245,18 @@ public class ReturnOrderService {
 
         BigDecimal unpenalizedCurrentRefund = computedRefundAmount;
 
-        // Cửa hàng chỉ hoàn lại số tiền thực tế khách đã trả
+        // Cửa hàng chỉ hoàn lại số tiền thực tế khách đã trả (bao gồm cả tiền chuyển thừa)
         BigDecimal previousRefundTotal = returnOrderRepository.getTotalRefundedByOrderId(order.getId());
         if (previousRefundTotal == null) {
             previousRefundTotal = BigDecimal.ZERO;
         }
 
-        BigDecimal remainingOrderPaidAmount = order.getTotalAmount().subtract(previousRefundTotal);
+        BigDecimal truePaidAmount = order.getPaidAmount() != null ? order.getPaidAmount() : BigDecimal.ZERO;
+        if (order.getChangeAmount() != null && order.getChangeAmount().compareTo(BigDecimal.ZERO) > 0) {
+            truePaidAmount = truePaidAmount.subtract(order.getChangeAmount());
+        }
+
+        BigDecimal remainingOrderPaidAmount = truePaidAmount.subtract(previousRefundTotal);
         if (computedRefundAmount.compareTo(remainingOrderPaidAmount) > 0) {
             computedRefundAmount = remainingOrderPaidAmount;
         }

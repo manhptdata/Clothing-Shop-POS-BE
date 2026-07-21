@@ -419,7 +419,7 @@ public class OrderService {
 
     // Hoàn thành thanh toán đơn hàng bằng QR_SEPAY
     @Transactional
-    public void completeOrderPayment(String orderNumber, BigDecimal paidAmount) {
+    public String completeOrderPayment(String orderNumber, BigDecimal paidAmount) {
         Order order = orderRepository.findByOrderNumberWithPessimisticLock(orderNumber)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng: " + orderNumber));
 
@@ -429,16 +429,19 @@ public class OrderService {
                     "Đơn hàng đã được thanh toán hoặc không ở trạng thái chờ thanh toán.");
         }
 
-        if (paidAmount.compareTo(order.getTotalAmount()) < 0) {
+        BigDecimal currentPaid = order.getPaidAmount() != null ? order.getPaidAmount() : BigDecimal.ZERO;
+        BigDecimal totalPaid = currentPaid.add(paidAmount);
+        order.setPaidAmount(totalPaid);
+        order.setPaymentMethod(PaymentMethod.QR_SEPAY);
+
+        if (totalPaid.compareTo(order.getTotalAmount()) < 0) {
             orderNotificationHelper.sendPaymentFailureNotification(order, paidAmount);
-            throw new BadRequestException("Số tiền thanh toán không đủ");
+            orderRepository.save(order);
+            return "INSUFFICIENT";
         }
 
         order.setStatus(OrderStatus.COMPLETED);
-        order.setPaymentMethod(PaymentMethod.QR_SEPAY);
-        order.setPaidAmount(paidAmount);
-
-        BigDecimal overpaid = paidAmount.subtract(order.getTotalAmount());
+        BigDecimal overpaid = totalPaid.subtract(order.getTotalAmount());
         // Tiền thối chỉ áp dụng cho TIỀN MẶT. Khóa changeAmount = 0 cho QR_SEPAY để
         // tránh thất thoát tiền mặt.
         order.setChangeAmount(BigDecimal.ZERO);
@@ -457,6 +460,8 @@ public class OrderService {
         orderLoyaltyService.processLoyaltyOnCompletion(savedOrder, customer, appliedVoucher);
         eventPublisher.publishEvent(new OrderCompletedEvent(savedOrder.getCustomerId(), savedOrder.getTotalAmount()));
         orderNotificationHelper.sendOrderNotifications(savedOrder, "QR_SEPAY");
+
+        return overpaid.compareTo(BigDecimal.ZERO) > 0 ? "OVERPAID" : "SUCCESS";
     }
 
     // Hoàn thành thanh toán đơn hàng bằng ID (sử dụng cho luồng POS thủ công/online

@@ -13,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -98,5 +100,29 @@ public class PaymentController {
         response.put("accountName", accountName);
 
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/logs/{id}/refund")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MANAGER')")
+    @ApiMessage("Xác nhận hoàn tiền thừa/trùng lặp thành công")
+    public ResponseEntity<Void> refundPaymentLog(
+            @PathVariable Integer id,
+            @RequestParam(required = false) BigDecimal refundAmount) {
+
+        PaymentLog log = paymentLogRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy log giao dịch"));
+
+        if (!"DUPLICATE_PAYMENT".equals(log.getStatus()) && !"OVERPAID".equals(log.getStatus())) {
+            throw new BadRequestException("Chỉ có thể hoàn tiền cho giao dịch chuyển trùng hoặc chuyển thừa");
+        }
+
+        log.setStatus("REFUNDED");
+
+        String amountStr = refundAmount != null ? refundAmount.toPlainString() : "Toàn bộ";
+        String extraNote = " | [Đã hoàn tiền mặt: " + amountStr + " VND]";
+        log.setContent(log.getContent() != null ? log.getContent() + extraNote : extraNote);
+
+        paymentLogRepository.save(log);
+        return ResponseEntity.ok().build();
     }
 }
