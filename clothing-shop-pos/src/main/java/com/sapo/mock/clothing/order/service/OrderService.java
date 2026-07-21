@@ -228,6 +228,7 @@ public class OrderService {
         if (order.getStatus() == OrderStatus.PENDING && order.getPaidAmount() != null 
                 && order.getPaidAmount().compareTo(totalAmount) >= 0) {
             order.setStatus(OrderStatus.COMPLETED);
+            paymentLogRepository.updateStatusByOrderNumberAndOldStatus(order.getOrderNumber(), "INSUFFICIENT", "SUCCESS");
             BigDecimal overpaid = order.getPaidAmount().subtract(totalAmount);
             if (order.getPaymentMethod() == PaymentMethod.CASH) {
                 order.setChangeAmount(overpaid);
@@ -501,6 +502,7 @@ public class OrderService {
         }
 
         order.setStatus(OrderStatus.COMPLETED);
+        paymentLogRepository.updateStatusByOrderNumberAndOldStatus(order.getOrderNumber(), "INSUFFICIENT", "SUCCESS");
         BigDecimal overpaid = totalPaid.subtract(order.getTotalAmount());
         // Tiền thối chỉ áp dụng cho TIỀN MẶT. Khóa changeAmount = 0 cho QR_SEPAY để
         // tránh thất thoát tiền mặt.
@@ -557,6 +559,7 @@ public class OrderService {
         }
 
         order.setStatus(OrderStatus.COMPLETED);
+        paymentLogRepository.updateStatusByOrderNumberAndOldStatus(order.getOrderNumber(), "INSUFFICIENT", "SUCCESS");
         PaymentMethod finalMethod = paymentMethod != null ? PaymentMethod.valueOf(paymentMethod) : PaymentMethod.CASH;
         order.setPaymentMethod(finalMethod);
         order.setPaidAmount(totalPaid);
