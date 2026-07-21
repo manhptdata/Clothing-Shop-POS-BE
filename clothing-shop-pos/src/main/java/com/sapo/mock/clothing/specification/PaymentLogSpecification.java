@@ -14,7 +14,7 @@ public class PaymentLogSpecification {
             List<Predicate> predicates = new ArrayList<>();
 
             if (StringUtils.hasText(orderNumber)) {
-                predicates.add(criteriaBuilder.like(root.get("orderNumber"), "%" + orderNumber + "%"));
+                predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("orderNumber")), "%" + orderNumber.toLowerCase() + "%"));
             }
             if (StringUtils.hasText(status)) {
                 predicates.add(criteriaBuilder.equal(root.get("status"), status));
