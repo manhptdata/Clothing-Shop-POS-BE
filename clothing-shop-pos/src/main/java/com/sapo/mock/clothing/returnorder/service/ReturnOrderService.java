@@ -183,7 +183,11 @@ public class ReturnOrderService {
         BigDecimal computedRefundAmount = BigDecimal.ZERO;
         BigDecimal returnedItemsSubtotal = BigDecimal.ZERO;
 
-        for (ReqCreateReturnDTO.ReturnItemDTO returnItemDto : dto.getItems()) {
+        // Anti-deadlock: Sắp xếp theo variantId tăng dần để luôn lock theo thứ tự cố định
+        List<ReqCreateReturnDTO.ReturnItemDTO> sortedReturnItems = new ArrayList<>(dto.getItems());
+        sortedReturnItems.sort(java.util.Comparator.comparing(ReqCreateReturnDTO.ReturnItemDTO::getVariantId));
+
+        for (ReqCreateReturnDTO.ReturnItemDTO returnItemDto : sortedReturnItems) {
             OrderLineItem originalItem = originalItemsMap.get(returnItemDto.getVariantId());
             if (originalItem == null) {
                 throw new BadRequestException("Sản phẩm ID " + returnItemDto.getVariantId() + " không có trong hóa đơn gốc.");

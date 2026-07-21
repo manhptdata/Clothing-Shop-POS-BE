@@ -28,7 +28,10 @@ public class ShiftHandoverService {
         Instant start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant();
         BigDecimal orderRevenue = orderRepository.calculateUserRevenueToday(username, start);
         BigDecimal sepayRefunds = paymentLogRepository.calculateTotalRefundByUsernameSince(username, start);
-        return orderRevenue.subtract(sepayRefunds);
+        // Bug #9 fix: Hoàn tiền qua SePay (Bank Transfer) KHÔNG lấy tiền mặt từ két.
+        // Do orderRevenue đã bị trừ TỔNG hoàn tiền (kể cả SePay) ở OrderRepository, ta phải CỘNG (+) 
+        // phần sepayRefunds trả lại cho két để tính ra số tiền mặt thực tế. (Tránh lỗi trừ kép làm thất thoát tiền).
+        return orderRevenue.add(sepayRefunds);
     }
 
     @Transactional

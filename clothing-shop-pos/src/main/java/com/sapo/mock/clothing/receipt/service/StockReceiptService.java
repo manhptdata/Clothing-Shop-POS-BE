@@ -194,7 +194,11 @@ public class StockReceiptService implements IStockReceiptService {
 //		receipt.setConfirmedBy(userId);
 
 		// 2. Vòng lặp cộng tồn kho thẳng vào ProductVariant & Ghi Log
-		for (StockReceiptItem item : receipt.getItems()) {
+		// Anti-deadlock: Sắp xếp items theo variant ID tăng dần
+		List<StockReceiptItem> sortedReceiptItems = new ArrayList<>(receipt.getItems());
+		sortedReceiptItems.sort(java.util.Comparator.comparing(i -> i.getVariant().getId()));
+
+		for (StockReceiptItem item : sortedReceiptItems) {
 			// Tìm biến thể thay vì tìm WarehouseStock
 			ProductVariant variant = variantRepository.findByIdWithPessimisticLock(item.getVariant().getId()).orElseThrow(
 					() -> new BadRequestException("Không tìm thấy biến thể SP ID: " + item.getVariant().getId()));
@@ -273,7 +277,11 @@ public class StockReceiptService implements IStockReceiptService {
 
 		// Nếu phiếu đang ở CONFIRMED, trừ tồn kho và rollback giá vốn MAC
 		if (receipt.getStatus() == ReceiptStatus.CONFIRMED) {
-			for (StockReceiptItem item : receipt.getItems()) {
+			// Anti-deadlock: Sắp xếp items theo variant ID tăng dần
+			List<StockReceiptItem> sortedCancelItems = new ArrayList<>(receipt.getItems());
+			sortedCancelItems.sort(java.util.Comparator.comparing(i -> i.getVariant().getId()));
+
+			for (StockReceiptItem item : sortedCancelItems) {
 				ProductVariant variant = variantRepository.findByIdWithPessimisticLock(item.getVariant().getId()).orElseThrow(
 						() -> new BadRequestException("Không tìm thấy biến thể SP ID: " + item.getVariant().getId()));
 

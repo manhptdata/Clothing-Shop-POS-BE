@@ -224,6 +224,35 @@ public class OrderService {
 
         finalizeOrderAmounts(dto, order, totalAmount);
 
+        // Fix Bug #3: Nếu số tiền đã trả/cọc trước đó >= totalAmount mới, tự động hoàn thành đơn hàng
+        if (order.getStatus() == OrderStatus.PENDING && order.getPaidAmount() != null 
+                && order.getPaidAmount().compareTo(totalAmount) >= 0) {
+            order.setStatus(OrderStatus.COMPLETED);
+            BigDecimal overpaid = order.getPaidAmount().subtract(totalAmount);
+            if (order.getPaymentMethod() == PaymentMethod.CASH) {
+                order.setChangeAmount(overpaid);
+            } else {
+                order.setChangeAmount(BigDecimal.ZERO);
+                if (overpaid.compareTo(BigDecimal.ZERO) > 0) {
+                    orderNotificationHelper.sendOverpaymentNotification(order, overpaid);
+                    PaymentLog paymentLog = new PaymentLog();
+                    paymentLog.setReferenceCode("OVERPAID_" + System.currentTimeMillis());
+                    paymentLog.setOrderNumber(order.getOrderNumber());
+                    paymentLog.setTransferAmount(overpaid);
+                    paymentLog.setGateway(order.getPaymentMethod().name());
+                    paymentLog.setTransactionDate(java.time.LocalDateTime.now()
+                            .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                    paymentLog.setContent("Tiền thừa do cập nhật giảm giá trị đơn hàng " + order.getOrderNumber());
+                    paymentLog.setStatus("OVERPAID");
+                    paymentLogRepository.save(paymentLog);
+
+                    order.setPaidAmount(totalAmount);
+                }
+            }
+            order.setPointsEarned(order.getCustomerId() == 1 ? 0 
+                    : totalAmount.divideToIntegralValue(PointConstant.EARN_RATE).intValue());
+        }
+
         orderInventoryService.deductProductStock(dto.getItems(), id, order.getOrderNumber());
 
         Order savedOrder = orderRepository.save(order);
@@ -283,7 +312,22 @@ public class OrderService {
         OrderStatus previousStatus = order.getStatus();
         order.setStatus(OrderStatus.CANCELLED);
         order.setCancelReason(dto.getReason());
-        order.setPaidAmount(BigDecimal.ZERO);
+        // order.setPaidAmount(BigDecimal.ZERO); // Không reset paidAmount để lưu lại dấu vết kiểm toán (Audit Trail)
+        
+        if (order.getPaidAmount() != null && order.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
+            PaymentLog paymentLog = new PaymentLog();
+            paymentLog.setReferenceCode("CANCEL_REFUND_" + System.currentTimeMillis());
+            paymentLog.setOrderNumber(order.getOrderNumber());
+            paymentLog.setTransferAmount(order.getPaidAmount());
+            paymentLog.setGateway(order.getPaymentMethod().name());
+            paymentLog.setTransactionDate(java.time.LocalDateTime.now()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            paymentLog.setContent("Cần hoàn tiền do hủy đơn hàng " + order.getOrderNumber());
+            paymentLog.setStatus("OVERPAID");
+            paymentLogRepository.save(paymentLog);
+            orderNotificationHelper.sendOverpaymentNotification(order, order.getPaidAmount());
+        }
+        
         Order savedOrder = orderRepository.save(order);
 
         Customer customer = getCustomerById(order.getCustomerId());
@@ -340,6 +384,8 @@ public class OrderService {
         order.setCreatedByUsername(createdBy.getUsername());
         order.setNote(dto.getNote());
 
+        PaymentMethod originalPaymentMethod = order.getPaymentMethod();
+
         PaymentMethod pm = dto.getPaymentMethod() != null ? PaymentMethod.valueOf(dto.getPaymentMethod())
                 : PaymentMethod.CASH;
         order.setPaymentMethod(pm);
@@ -351,7 +397,16 @@ public class OrderService {
             }
             // Nếu update (getId() != null), giữ nguyên paidAmount cũ để không mất số tiền khách đã chuyển khoản 1 phần
         } else {
-            order.setPaidAmount(dto.getPaidAmount() != null ? dto.getPaidAmount() : BigDecimal.ZERO);
+            if (dto.getPaidAmount() != null) {
+                if (order.getId() != null && originalPaymentMethod == PaymentMethod.QR_SEPAY) {
+                    BigDecimal existingPaid = order.getPaidAmount() != null ? order.getPaidAmount() : BigDecimal.ZERO;
+                    order.setPaidAmount(dto.getPaidAmount().max(existingPaid));
+                } else {
+                    order.setPaidAmount(dto.getPaidAmount());
+                }
+            } else if (order.getId() == null) {
+                order.setPaidAmount(BigDecimal.ZERO);
+            }
             OrderStatus requestedStatus = dto.getStatus();
             if (requestedStatus != null && requestedStatus != OrderStatus.COMPLETED && requestedStatus != OrderStatus.PENDING) {
                 throw new BadRequestException("Trạng thái đơn hàng không hợp lệ. Chỉ được phép tạo/cập nhật ở trạng thái PENDING hoặc COMPLETED.");
@@ -431,8 +486,7 @@ public class OrderService {
 
         if (order.getStatus() != OrderStatus.PENDING) {
             orderNotificationHelper.sendDuplicatePaymentNotification(order, paidAmount);
-            throw new com.sapo.mock.clothing.exception.DuplicatePaymentException(
-                    "Đơn hàng đã được thanh toán hoặc không ở trạng thái chờ thanh toán.");
+            return "DUPLICATE_PAYMENT";
         }
 
         BigDecimal currentPaid = order.getPaidAmount() != null ? order.getPaidAmount() : BigDecimal.ZERO;
@@ -454,6 +508,19 @@ public class OrderService {
 
         if (overpaid.compareTo(BigDecimal.ZERO) > 0) {
             orderNotificationHelper.sendOverpaymentNotification(order, overpaid);
+            
+            PaymentLog paymentLog = new PaymentLog();
+            paymentLog.setReferenceCode("OVERPAID_" + System.currentTimeMillis());
+            paymentLog.setOrderNumber(order.getOrderNumber());
+            paymentLog.setTransferAmount(overpaid);
+            paymentLog.setGateway(PaymentMethod.QR_SEPAY.name());
+            paymentLog.setTransactionDate(java.time.LocalDateTime.now()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            paymentLog.setContent("Tiền thừa do khách chuyển dư qua SePay cho đơn hàng " + order.getOrderNumber());
+            paymentLog.setStatus("OVERPAID");
+            paymentLogRepository.save(paymentLog);
+
+            order.setPaidAmount(order.getTotalAmount());
         }
         order.setPointsEarned(order.getCustomerId() == 1 ? 0
                 : order.getTotalAmount().divideToIntegralValue(PointConstant.EARN_RATE).intValue());
@@ -467,7 +534,7 @@ public class OrderService {
         eventPublisher.publishEvent(new OrderCompletedEvent(savedOrder.getCustomerId(), savedOrder.getTotalAmount()));
         orderNotificationHelper.sendOrderNotifications(savedOrder, "QR_SEPAY");
 
-        return overpaid.compareTo(BigDecimal.ZERO) > 0 ? "OVERPAID" : "SUCCESS";
+        return "SUCCESS";
     }
 
     // Hoàn thành thanh toán đơn hàng bằng ID (sử dụng cho luồng POS thủ công/online
@@ -480,17 +547,21 @@ public class OrderService {
             return mapToResOrderDTO(order, orderLineItemRepository.findByOrderId(id));
         }
 
-        BigDecimal amount = paidAmount != null ? paidAmount : order.getTotalAmount();
-        if (amount.compareTo(order.getTotalAmount()) < 0) {
-            throw new BadRequestException("Số tiền thanh toán không đủ");
+        BigDecimal currentPaid = order.getPaidAmount() != null ? order.getPaidAmount() : BigDecimal.ZERO;
+        BigDecimal inputAmount = paidAmount != null ? paidAmount : order.getTotalAmount().subtract(currentPaid);
+        BigDecimal totalPaid = currentPaid.add(inputAmount);
+
+        if (totalPaid.compareTo(order.getTotalAmount()) < 0) {
+            throw new BadRequestException("Số tiền thanh toán không đủ. Đơn hàng còn thiếu: " 
+                    + order.getTotalAmount().subtract(totalPaid) + " VNĐ");
         }
 
         order.setStatus(OrderStatus.COMPLETED);
         PaymentMethod finalMethod = paymentMethod != null ? PaymentMethod.valueOf(paymentMethod) : PaymentMethod.CASH;
         order.setPaymentMethod(finalMethod);
-        order.setPaidAmount(amount);
+        order.setPaidAmount(totalPaid);
         if (finalMethod == PaymentMethod.CASH) {
-            order.setChangeAmount(amount.subtract(order.getTotalAmount()));
+            order.setChangeAmount(totalPaid.subtract(order.getTotalAmount()));
         } else {
             order.setChangeAmount(BigDecimal.ZERO);
         }
@@ -508,12 +579,17 @@ public class OrderService {
             PaymentLog paymentLog = new PaymentLog();
             paymentLog.setReferenceCode("MANUAL_" + System.currentTimeMillis());
             paymentLog.setOrderNumber(savedOrder.getOrderNumber());
-            paymentLog.setTransferAmount(amount);
+            paymentLog.setTransferAmount(inputAmount);
             paymentLog.setGateway("MANUAL");
             paymentLog.setTransactionDate(java.time.LocalDateTime.now()
                     .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             paymentLog.setContent("Thanh toán QR được xác nhận thủ công cho đơn " + savedOrder.getOrderNumber());
-            paymentLog.setStatus("SUCCESS");
+            if (totalPaid.compareTo(savedOrder.getTotalAmount()) > 0) {
+                paymentLog.setStatus("OVERPAID");
+                orderNotificationHelper.sendOverpaymentNotification(savedOrder, totalPaid.subtract(savedOrder.getTotalAmount()));
+            } else {
+                paymentLog.setStatus("SUCCESS");
+            }
             paymentLogRepository.save(paymentLog);
         }
 
