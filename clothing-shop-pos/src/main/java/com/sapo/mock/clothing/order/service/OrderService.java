@@ -343,7 +343,10 @@ public class OrderService {
 
         if (pm == PaymentMethod.QR_SEPAY) {
             order.setStatus(OrderStatus.PENDING);
-            order.setPaidAmount(BigDecimal.ZERO);
+            if (order.getId() == null) {
+                order.setPaidAmount(BigDecimal.ZERO);
+            }
+            // Nếu update (getId() != null), giữ nguyên paidAmount cũ để không mất số tiền khách đã chuyển khoản 1 phần
         } else {
             order.setPaidAmount(dto.getPaidAmount() != null ? dto.getPaidAmount() : BigDecimal.ZERO);
             OrderStatus requestedStatus = dto.getStatus();
