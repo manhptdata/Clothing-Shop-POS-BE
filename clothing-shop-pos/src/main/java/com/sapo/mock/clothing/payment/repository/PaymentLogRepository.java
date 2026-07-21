@@ -27,4 +27,11 @@ public interface PaymentLogRepository extends JpaRepository<PaymentLog, Integer>
     void updateByReferenceCode(@Param("referenceCode") String referenceCode,
                                @Param("status") String status,
                                @Param("orderNumber") String orderNumber);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE PaymentLog p SET p.status = :newStatus WHERE p.orderNumber = :orderNumber AND p.status = :oldStatus")
+    void updateStatusByOrderNumberAndOldStatus(@Param("orderNumber") String orderNumber,
+                                               @Param("oldStatus") String oldStatus,
+                                               @Param("newStatus") String newStatus);
 }

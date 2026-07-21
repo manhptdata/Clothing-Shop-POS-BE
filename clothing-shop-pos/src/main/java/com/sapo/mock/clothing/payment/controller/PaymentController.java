@@ -107,6 +107,7 @@ public class PaymentController {
     }
 
     @PostMapping("/logs/{id}/refund")
+    @org.springframework.transaction.annotation.Transactional
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MANAGER')")
     @ApiMessage("Xác nhận hoàn tiền thừa/trùng lặp thành công")
     public ResponseEntity<Void> refundPaymentLog(
@@ -128,6 +129,23 @@ public class PaymentController {
             }
             if (actualRefund.compareTo(log.getTransferAmount()) > 0) {
                 throw new BadRequestException("Số tiền hoàn (" + actualRefund + ") không được lớn hơn tổng số tiền khách đã chuyển (" + log.getTransferAmount() + ")");
+            }
+        }
+
+        if ("INSUFFICIENT".equals(log.getStatus())) {
+            if (log.getOrderNumber() != null && !log.getOrderNumber().isBlank()) {
+                Order order = orderRepository.findByOrderNumber(log.getOrderNumber()).orElse(null);
+                if (order != null) {
+                    if (order.getStatus() == OrderStatus.COMPLETED) {
+                        throw new BadRequestException("Không thể hoàn tiền giao dịch này vì đơn hàng đã hoàn thành. Vui lòng xử lý qua Đơn trả hàng.");
+                    }
+                    if (actualRefund != null) {
+                        BigDecimal currentPaid = order.getPaidAmount() != null ? order.getPaidAmount() : BigDecimal.ZERO;
+                        BigDecimal newPaid = currentPaid.subtract(actualRefund);
+                        order.setPaidAmount(newPaid.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : newPaid);
+                        orderRepository.save(order);
+                    }
+                }
             }
         }
 
