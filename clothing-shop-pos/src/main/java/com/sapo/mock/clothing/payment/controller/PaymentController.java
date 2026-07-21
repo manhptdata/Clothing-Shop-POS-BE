@@ -116,8 +116,8 @@ public class PaymentController {
         PaymentLog log = paymentLogRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy log giao dịch"));
 
-        if (!"DUPLICATE_PAYMENT".equals(log.getStatus()) && !"OVERPAID".equals(log.getStatus())) {
-            throw new BadRequestException("Chỉ có thể hoàn tiền cho giao dịch chuyển trùng hoặc chuyển thừa");
+        if (!"DUPLICATE_PAYMENT".equals(log.getStatus()) && !"OVERPAID".equals(log.getStatus()) && !"INSUFFICIENT".equals(log.getStatus())) {
+            throw new BadRequestException("Chỉ có thể hoàn tiền cho giao dịch chuyển trùng, chuyển thừa hoặc chuyển thiếu");
         }
 
         log.setStatus("REFUNDED");
