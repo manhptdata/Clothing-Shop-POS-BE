@@ -276,6 +276,9 @@ public class OrderService {
         if (order.getStatus() == OrderStatus.RETURNED || order.getStatus() == OrderStatus.PARTIALLY_RETURNED) {
             throw new BadRequestException("Không thể hủy đơn hàng đã có trả hàng. Vui lòng xử lý qua phiếu trả hàng.");
         }
+        if (paymentLogRepository.existsByOrderNumberAndStatus(order.getOrderNumber(), "INSUFFICIENT")) {
+            throw new BadRequestException("Đơn hàng đang có khoản chuyển thiếu tiền chưa xử lý. Vui lòng sang trang Lịch sử thanh toán thực hiện hoàn tiền trước khi hủy đơn.");
+        }
 
         OrderStatus previousStatus = order.getStatus();
         order.setStatus(OrderStatus.CANCELLED);
