@@ -42,13 +42,14 @@ public class PaymentController {
     public ResponseEntity<RestResponse<Page<PaymentLog>>> getPaymentLogs(
             @RequestParam(required = false) String orderNumber,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String gateway,
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
         
         org.springframework.data.jpa.domain.Specification<PaymentLog> spec = 
-            com.sapo.mock.clothing.specification.PaymentLogSpecification.filterLogs(orderNumber, status, startDate, endDate);
+            com.sapo.mock.clothing.specification.PaymentLogSpecification.filterLogs(orderNumber, status, gateway, startDate, endDate);
 
         Page<PaymentLog> result = paymentLogRepository.findAll(
             spec,
