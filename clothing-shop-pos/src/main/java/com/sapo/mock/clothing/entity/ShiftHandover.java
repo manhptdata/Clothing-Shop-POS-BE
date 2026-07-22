@@ -23,17 +23,29 @@ public class ShiftHandover {
     @Column(name = "shift_name", nullable = false)
     private String shiftName; // e.g. Ca sáng, Ca chiều
 
+    @Column(name = "initial_amount", nullable = false)
+    private BigDecimal initialAmount = BigDecimal.ZERO; // Tiền lẻ đầu ca
+
     @Column(name = "system_amount", nullable = false)
-    private BigDecimal systemAmount; // Doanh thu hệ thống tính toán
+    private BigDecimal systemAmount = BigDecimal.ZERO; // Doanh thu hệ thống tính toán
 
     @Column(name = "actual_amount", nullable = false)
-    private BigDecimal actualAmount; // Tiền mặt thực tế đếm được
+    private BigDecimal actualAmount = BigDecimal.ZERO; // Tiền mặt thực tế đếm được
 
     @Column(name = "discrepancy", nullable = false)
-    private BigDecimal discrepancy; // Chênh lệch (actual - system)
+    private BigDecimal discrepancy = BigDecimal.ZERO; // Chênh lệch (actual - system)
+
+    @Column(name = "status", nullable = false, length = 20)
+    private String status = "COMPLETED"; // OPEN, COMPLETED
 
     @Column(length = 500)
     private String note;
+
+    @Column(name = "opened_at")
+    private Instant openedAt;
+
+    @Column(name = "closed_at")
+    private Instant closedAt;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;

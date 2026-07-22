@@ -47,4 +47,7 @@ public class ReturnOrderLineItem {
 
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal subtotal;
+
+    @Column(name = "is_restocked", nullable = false)
+    private boolean isRestocked = true;
 }

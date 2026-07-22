@@ -24,6 +24,7 @@ public class ResOrderDTO {
 
     private Integer createdById;
     private String createdByUsername;
+    private String cashierUsername;
 
     private BigDecimal totalAmount;
     private BigDecimal paidAmount;

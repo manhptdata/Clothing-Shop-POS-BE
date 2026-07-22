@@ -61,23 +61,32 @@ public class CustomerRankScheduler {
                 BigDecimal spendingInLastYear = customerRepository.calculateSpendingInTimeRange(customer.getId(), oneYearAgo);
                 RankCodeEnum targetRank = currentRank;
 
-                // Thực thi chính xác logic nghiệp vụ phân tầng rớt hạng chuẩn của Đức
+                // Lấy ngưỡng minSpending cấu hình trong DB cho từng hạng
+                BigDecimal goldMinSpend = activeGroups.stream()
+                        .filter(g -> g.getCode() == RankCodeEnum.GOLD)
+                        .map(CustomerGroup::getMinSpending)
+                        .filter(java.util.Objects::nonNull)
+                        .findFirst().orElse(new BigDecimal("20000000"));
+
+                BigDecimal silverMinSpend = activeGroups.stream()
+                        .filter(g -> g.getCode() == RankCodeEnum.SILVER)
+                        .map(CustomerGroup::getMinSpending)
+                        .filter(java.util.Objects::nonNull)
+                        .findFirst().orElse(new BigDecimal("5000000"));
+
                 if (currentRank == RankCodeEnum.GOLD) {
-                    // Khách đang hạng Vàng (GOLD)
-                    if (spendingInLastYear.compareTo(new BigDecimal("20000000")) >= 0) {
-                        targetRank = RankCodeEnum.GOLD; // Doanh số >= 20tr: Giữ nguyên hạng Vàng
-                    } else if (spendingInLastYear.compareTo(new BigDecimal("5000000")) >= 0) {
-                        targetRank = RankCodeEnum.SILVER; // Doanh số từ 5tr đến < 20tr: Hạ xuống Bạc
+                    if (spendingInLastYear.compareTo(goldMinSpend) >= 0) {
+                        targetRank = RankCodeEnum.GOLD;
+                    } else if (spendingInLastYear.compareTo(silverMinSpend) >= 0) {
+                        targetRank = RankCodeEnum.SILVER;
                     } else {
-                        targetRank = RankCodeEnum.BRONZE; // Doanh số < 5tr: Hạ hẳn xuống Đồng
+                        targetRank = RankCodeEnum.BRONZE;
                     }
-                }
-                else if (currentRank == RankCodeEnum.SILVER) {
-                    // Khách đang hạng Bạc (SILVER)
-                    if (spendingInLastYear.compareTo(new BigDecimal("5000000")) >= 0) {
-                        targetRank = RankCodeEnum.SILVER; // Doanh số >= 5tr: Giữ nguyên hạng Bạc
+                } else if (currentRank == RankCodeEnum.SILVER) {
+                    if (spendingInLastYear.compareTo(silverMinSpend) >= 0) {
+                        targetRank = RankCodeEnum.SILVER;
                     } else {
-                        targetRank = RankCodeEnum.BRONZE; // Doanh số < 5tr: Hạ xuống hạng Đồng
+                        targetRank = RankCodeEnum.BRONZE;
                     }
                 }
 

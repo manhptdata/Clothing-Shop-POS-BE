@@ -29,7 +29,7 @@ public class SePayWebhookController {
 
     private final OrderService orderService;
     private final PaymentLogRepository paymentLogRepository;
-    private static final Pattern ORDER_NUMBER_PATTERN = Pattern.compile("\\bHD-?\\d{8}-?\\d{3,}\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ORDER_NUMBER_PATTERN = Pattern.compile("\\bHD[\\s_-]?\\d{8}[\\s_-]?\\d{3,}\\b", Pattern.CASE_INSENSITIVE);
 
     @Value("${sepay.webhook.token}")
     private String webhookToken;

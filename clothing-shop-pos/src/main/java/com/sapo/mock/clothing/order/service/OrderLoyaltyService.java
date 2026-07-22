@@ -107,7 +107,12 @@ public class OrderLoyaltyService {
             }
 
             VoucherUsage usage = null;
-            if (voucher.getMaxUsagePerUser() != null && voucher.getMaxUsagePerUser() > 0 && customer != null && customer.getId() != 1) {
+            if (voucher.getMaxUsagePerUser() != null && voucher.getMaxUsagePerUser() > 0) {
+                if (customer == null || customer.getId() == 1) {
+                    throw new BadRequestException("Mã voucher này giới hạn " + voucher.getMaxUsagePerUser()
+                            + " lần/khách hàng, không thể áp dụng cho Khách vãng lai. Vui lòng chọn hoặc tạo tài khoản khách hàng.");
+                }
+
                 // Lock Customer để serialize các request áp dụng mã của cùng 1 user
                 customerRepository.findByIdWithPessimisticLock(customer.getId());
 
@@ -125,8 +130,8 @@ public class OrderLoyaltyService {
                 }
             }
 
-            // RESERVE: Tăng usedQuantity của Public Voucher bằng Atomic SQL Update và usageCount ngay khi áp dụng
-            if (!isSamePublicVoucher) {
+            // RESERVE: Chỉ tăng usedQuantity nếu đơn hàng được hoàn tất (COMPLETED) trực tiếp trong cùng luồng
+            if (!isSamePublicVoucher && order.getStatus() == OrderStatus.COMPLETED) {
                 int rowsUpdated = voucherRepository.incrementUsedQuantity(code);
                 if (rowsUpdated == 0) {
                     throw new BadRequestException("Mã voucher này đã hết lượt sử dụng hoặc không khả dụng");
@@ -196,6 +201,21 @@ public class OrderLoyaltyService {
             lockedVoucher.setUsedAt(Instant.now());
             lockedVoucher.setOrderId(savedOrder.getId());
             customerVoucherRepository.save(lockedVoucher);
+        } else if (savedOrder.getVoucherCode() != null && !savedOrder.getVoucherCode().isBlank()) {
+            // Tăng usedQuantity của Public Voucher khi đơn hàng hoàn thành thanh toán
+            voucherRepository.incrementUsedQuantity(savedOrder.getVoucherCode());
+            if (customerParam != null && customerParam.getId() != 1) {
+                VoucherUsage usage = voucherUsageRepository.findByCustomerIdAndVoucherCodeWithPessimisticLock(customerParam.getId(), savedOrder.getVoucherCode())
+                        .orElseGet(() -> {
+                            VoucherUsage vu = new VoucherUsage();
+                            vu.setCustomerId(customerParam.getId());
+                            vu.setVoucherCode(savedOrder.getVoucherCode());
+                            vu.setUsageCount(0);
+                            return vu;
+                        });
+                usage.setUsageCount(usage.getUsageCount() + 1);
+                voucherUsageRepository.save(usage);
+            }
         }
 
         if (customerParam.getId() != 1) {
@@ -259,7 +279,9 @@ public class OrderLoyaltyService {
         if (appliedWalletVoucher != null) {
             if (appliedWalletVoucher.getStatus() == CustomerVoucherStatusEnum.USED || appliedWalletVoucher.getStatus() == CustomerVoucherStatusEnum.RESERVED) {
                 if (appliedWalletVoucher.getExpiredAt().isBefore(Instant.now())) {
-                    appliedWalletVoucher.setStatus(CustomerVoucherStatusEnum.EXPIRED);
+                    // Grace Period: ân hạn gia hạn 60 phút cho Voucher cá nhân bị trôi giờ khi hủy đơn PENDING
+                    appliedWalletVoucher.setExpiredAt(Instant.now().plus(1, java.time.temporal.ChronoUnit.HOURS));
+                    appliedWalletVoucher.setStatus(CustomerVoucherStatusEnum.UNUSED);
                 } else {
                     appliedWalletVoucher.setStatus(CustomerVoucherStatusEnum.UNUSED);
                 }
@@ -268,18 +290,20 @@ public class OrderLoyaltyService {
             appliedWalletVoucher.setOrderId(null);
             customerVoucherRepository.save(appliedWalletVoucher);
         } else if (savedOrder.getVoucherCode() != null && !savedOrder.getVoucherCode().isBlank()) {
-            // Hoàn lại số lượng đã sử dụng (usedQuantity) cho Public Voucher khi hủy đơn bằng Atomic SQL
-            voucherRepository.decrementUsedQuantity(savedOrder.getVoucherCode());
+            if (savedOrder.getStatus() == OrderStatus.COMPLETED) {
+                // Hoàn lại số lượng đã sử dụng (usedQuantity) cho Public Voucher khi hủy đơn đã COMPLETED bằng Atomic SQL
+                voucherRepository.decrementUsedQuantity(savedOrder.getVoucherCode());
 
-            // Hoàn lại usageCount trong VoucherUsage cho khách hàng khi hủy đơn
-            if (customerParam != null && customerParam.getId() != 1) {
-                voucherUsageRepository.findByCustomerIdAndVoucherCodeWithPessimisticLock(customerParam.getId(), savedOrder.getVoucherCode())
-                        .ifPresent(usage -> {
-                            if (usage.getUsageCount() != null && usage.getUsageCount() > 0) {
-                                usage.setUsageCount(usage.getUsageCount() - 1);
-                                voucherUsageRepository.save(usage);
-                            }
-                        });
+                // Hoàn lại usageCount trong VoucherUsage cho khách hàng
+                if (customerParam != null && customerParam.getId() != 1) {
+                    voucherUsageRepository.findByCustomerIdAndVoucherCodeWithPessimisticLock(customerParam.getId(), savedOrder.getVoucherCode())
+                            .ifPresent(usage -> {
+                                if (usage.getUsageCount() != null && usage.getUsageCount() > 0) {
+                                    usage.setUsageCount(usage.getUsageCount() - 1);
+                                    voucherUsageRepository.save(usage);
+                                }
+                            });
+                }
             }
         }
     }
@@ -299,13 +323,16 @@ public class OrderLoyaltyService {
             }
             if (savedOrder.getPointsEarned() > 0) {
                 int currentPoints = customer.getRewardPoints() != null ? customer.getRewardPoints() : 0;
-                if (currentPoints < savedOrder.getPointsEarned()) {
-                    throw new BadRequestException("Không thể hủy/trả đơn hàng vì khách hàng đã tiêu mất điểm tích lũy của đơn này (Cần " 
-                            + savedOrder.getPointsEarned() + " điểm, nhưng khách chỉ còn " + currentPoints + " điểm).");
+                int pointsToDeduct = savedOrder.getPointsEarned();
+                if (currentPoints < pointsToDeduct) {
+                    customer.setRewardPoints(0);
+                    savePointHistory(customer.getId(), savedOrder.getId(), -currentPoints,
+                            PointConstant.TYPE_REFUND, "Khấu trừ toàn bộ " + currentPoints + " điểm hiện có do hủy đơn " + savedOrder.getOrderNumber() + " (Thiếu " + (pointsToDeduct - currentPoints) + " điểm)");
+                } else {
+                    customer.setRewardPoints(currentPoints - pointsToDeduct);
+                    savePointHistory(customer.getId(), savedOrder.getId(), -pointsToDeduct,
+                            PointConstant.TYPE_REFUND, "Trừ điểm tích lũy do hủy đơn hàng " + savedOrder.getOrderNumber());
                 }
-                customer.setRewardPoints(currentPoints - savedOrder.getPointsEarned());
-                savePointHistory(customer.getId(), savedOrder.getId(), -savedOrder.getPointsEarned(),
-                        PointConstant.TYPE_REFUND, "Trừ điểm tích lũy do hủy đơn hàng " + savedOrder.getOrderNumber());
             }
             customerRepository.save(customer);
         }

@@ -22,15 +22,17 @@ public class ExpiredPendingOrderScheduler {
 
     private final OrderRepository orderRepository;
     private final OrderService orderService;
+    private final com.sapo.mock.clothing.setting.service.SystemSettingService systemSettingService;
 
     /**
-     * Chạy mỗi 15 phút. Quét các đơn PENDING được tạo cách đây hơn 30 phút.
+     * Chạy mỗi 1 phút. Quét các đơn PENDING được tạo cách đây vượt quá số phút cấu hình.
      */
-    @Scheduled(fixedRate = 900000) // 15 phút = 15 * 60 * 1000 ms
+    @Scheduled(fixedRate = 60000) // 1 phút = 1 * 60 * 1000 ms
     public void cancelExpiredPendingOrders() {
-        log.info("[ExpiredPendingOrderScheduler] Bắt đầu quét đơn hàng PENDING quá hạn...");
+        int timeoutMinutes = systemSettingService.getPendingOrderTimeoutMinutes();
+        log.info("[ExpiredPendingOrderScheduler] Bắt đầu quét đơn hàng PENDING quá hạn (cấu hình {} phút)...", timeoutMinutes);
         
-        Instant thresholdTime = Instant.now().minus(30, ChronoUnit.MINUTES);
+        Instant thresholdTime = Instant.now().minus(timeoutMinutes, ChronoUnit.MINUTES);
         List<Order> expiredOrders = orderRepository.findByStatusAndCreatedAtBefore(OrderStatus.PENDING, thresholdTime);
         
         if (expiredOrders.isEmpty()) {
@@ -39,17 +41,18 @@ public class ExpiredPendingOrderScheduler {
         }
 
         ReqCancelOrderDTO cancelDto = new ReqCancelOrderDTO();
-        cancelDto.setReason("Hệ thống tự động hủy do hết hạn thanh toán PENDING (quá 30 phút)");
+        String cancelReason = "Hệ thống tự động hủy do hết hạn thanh toán PENDING (quá " + timeoutMinutes + " phút)";
+        cancelDto.setReason(cancelReason);
 
         int count = 0;
         for (Order order : expiredOrders) {
             try {
-                // Gọi qua orderService để kích hoạt cả logic hoàn Loyalty
-                orderService.cancelOrder(order.getId(), cancelDto, "system");
+                // Gọi cancelExpiredSystemOrder để bỏ qua bước check PIN admin và bảo vệ đơn đã nạp cọc/thiếu tiền
+                orderService.cancelExpiredSystemOrder(order.getId(), cancelReason);
                 count++;
-                log.info("Đã tự động hủy đơn hàng: {}", order.getOrderNumber());
+                log.info("Đã rà soát tự động đơn hàng: {}", order.getOrderNumber());
             } catch (Exception e) {
-                log.error("Lỗi khi tự động hủy đơn {}: {}", order.getOrderNumber(), e.getMessage());
+                log.error("Lỗi khi tự động rà soát hủy đơn {}: {}", order.getOrderNumber(), e.getMessage());
             }
         }
         

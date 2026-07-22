@@ -10,4 +10,5 @@ public interface SystemSettingService {
     boolean isReturnApprovalRequired();
     boolean isCancelApprovalRequired();
     int getMaxPendingOrdersLimit();
+    int getPendingOrderTimeoutMinutes();
 }

@@ -15,5 +15,7 @@ import java.time.LocalDate;
 public class DailyStatisticItemResponse {
     private LocalDate date;
     private BigDecimal revenue;
+    private BigDecimal cogs;
+    private BigDecimal profit;
     private long orderCount;
 }

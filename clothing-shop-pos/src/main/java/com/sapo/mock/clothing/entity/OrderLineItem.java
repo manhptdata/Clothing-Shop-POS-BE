@@ -42,6 +42,9 @@ public class OrderLineItem {
     @Column(name = "unit_price", nullable = false, precision = 15, scale = 2)
     private BigDecimal unitPrice;
 
+    @Column(name = "cost_price", precision = 15, scale = 2)
+    private BigDecimal costPrice;
+
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal subtotal;
 }

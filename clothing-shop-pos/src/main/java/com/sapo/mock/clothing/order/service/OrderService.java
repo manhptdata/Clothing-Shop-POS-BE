@@ -19,6 +19,7 @@ import com.sapo.mock.clothing.setting.service.SystemSettingService;
 import com.sapo.mock.clothing.payment.repository.PaymentLogRepository;
 import com.sapo.mock.clothing.entity.PaymentLog;
 import com.sapo.mock.clothing.customer.repository.CustomerVoucherRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -56,6 +57,7 @@ public class OrderService {
     private final SystemSettingService systemSettingService;
     private final PaymentLogRepository paymentLogRepository;
     private final CustomerVoucherRepository customerVoucherRepository;
+    private final PasswordEncoder passwordEncoder;
 
     // Tạo đơn hàng mới
     @Transactional
@@ -280,16 +282,20 @@ public class OrderService {
         Order order = orderRepository.findByIdWithPessimisticLock(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Đơn hàng ID " + id + " không tồn tại"));
 
-        if (systemSettingService.isCancelApprovalRequired()) {
+        // CHỈ MIỄN PIN ADMIN NẾU LÀ ĐƠN PENDING THUẦN TÚY VÀ CHƯA NẠP 1 ĐỒNG CỌC NÀO (paidAmount == 0)
+        boolean isPurePendingZeroPaid = (order.getStatus() == OrderStatus.PENDING) 
+                && (order.getPaidAmount() == null || order.getPaidAmount().compareTo(BigDecimal.ZERO) == 0);
+
+        if (!isPurePendingZeroPaid && systemSettingService.isCancelApprovalRequired()) {
             if (dto.getApprovalPin() == null || dto.getApprovalPin().isEmpty()) {
-                throw new BadRequestException("Cần có mã PIN quản lý để duyệt hủy đơn hàng.");
+                throw new BadRequestException("Cần có mã PIN quản lý để duyệt hủy đơn hàng này.");
             }
 
-            // Kiểm tra PIN
+            // Kiểm tra PIN băm BCrypt
             List<User> approvers = userRepository.findAll().stream()
                     .filter(u -> "ROLE_ADMIN".equals(u.getRole().getName())
                             || "ROLE_MANAGER".equals(u.getRole().getName()))
-                    .filter(u -> u.getSecurityPin() != null && u.getSecurityPin().equals(dto.getApprovalPin()))
+                    .filter(u -> u.getSecurityPin() != null && passwordEncoder.matches(dto.getApprovalPin(), u.getSecurityPin()))
                     .toList();
 
             if (approvers.isEmpty()) {
@@ -343,6 +349,42 @@ public class OrderService {
         return mapToResOrderDTO(savedOrder, items);
     }
 
+    // Tiến trình tự động hủy đơn PENDING quá hạn (Server/CronJob ngầm) - BẢO VỆ TIỀN KHÁCH HÀNG
+    @Transactional
+    public ResOrderDTO cancelExpiredSystemOrder(Integer id, String reason) {
+        Order order = orderRepository.findByIdWithPessimisticLock(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Đơn hàng ID " + id + " không tồn tại"));
+
+        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.COMPLETED) {
+            return mapToResOrderDTO(order, orderLineItemRepository.findByOrderId(id));
+        }
+
+        // BẢO VỆ TIỀN CỦA KHÁCH HÀNG:
+        // Nếu đơn PENDING mà khách ĐÃ CHUYỂN 1 PHẦN TIỀN (paidAmount > 0) hoặc có vết INSUFFICIENT
+        // Tuyệt đối KHÔNG HỦY TỰ ĐỘNG. Giữ nguyên đơn và gửi thông báo cảnh báo cho Quản lý/Thu ngân
+        boolean hasInsufficientPayment = paymentLogRepository.existsByOrderNumberAndStatus(order.getOrderNumber(), "INSUFFICIENT");
+        if ((order.getPaidAmount() != null && order.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) || hasInsufficientPayment) {
+            orderNotificationHelper.sendPaymentFailureNotification(order, order.getPaidAmount() != null ? order.getPaidAmount() : BigDecimal.ZERO);
+            return mapToResOrderDTO(order, orderLineItemRepository.findByOrderId(id));
+        }
+
+        OrderStatus previousStatus = order.getStatus();
+        order.setStatus(OrderStatus.CANCELLED);
+        order.setCancelReason(reason);
+
+        Order savedOrder = orderRepository.save(order);
+        Customer customer = getCustomerById(order.getCustomerId());
+
+        if (previousStatus == OrderStatus.PENDING) {
+            orderLoyaltyService.revertLoyaltyOnCancel(savedOrder, customer);
+        }
+
+        List<OrderLineItem> items = orderLineItemRepository.findByOrderId(id);
+        orderInventoryService.restoreProductStock(items, id, order.getOrderNumber());
+
+        return mapToResOrderDTO(savedOrder, items);
+    }
+
     // Đánh dấu đơn hàng đã in
     @Transactional
     public ResOrderDTO updatePrintStatus(Integer id, boolean status) {
@@ -353,11 +395,13 @@ public class OrderService {
         return mapToResOrderDTO(order, orderLineItemRepository.findByOrderId(id));
     }
 
-    // Lấy thông tin người dùng
     private User getUserByUsername(String username) {
         User user = userRepository.findByUsername(username);
         if (user == null)
             throw new ResourceNotFoundException("Không tìm thấy người dùng: " + username);
+        if (!user.isActive()) {
+            throw new BadRequestException("Tài khoản nhân viên '" + username + "' đã bị vô hiệu hóa hoặc bị khóa.");
+        }
         return user;
     }
 
@@ -383,8 +427,11 @@ public class OrderService {
         order.setCustomerName(customer.getFullName());
         order.setCreatedBy(createdBy.getId());
         order.setCreatedByUsername(createdBy.getUsername());
+        if (order.getCashierUsername() == null) {
+            order.setCashierUsername(createdBy.getUsername());
+        }
         order.setNote(dto.getNote());
-
+        
         PaymentMethod originalPaymentMethod = order.getPaymentMethod();
 
         PaymentMethod pm = dto.getPaymentMethod() != null ? PaymentMethod.valueOf(dto.getPaymentMethod())
@@ -399,13 +446,8 @@ public class OrderService {
             // Nếu update (getId() != null), giữ nguyên paidAmount cũ để không mất số tiền khách đã chuyển khoản 1 phần
         } else {
             if (dto.getPaidAmount() != null) {
-                if (order.getId() != null && originalPaymentMethod == PaymentMethod.QR_SEPAY) {
-                    BigDecimal existingPaid = order.getPaidAmount() != null ? order.getPaidAmount() : BigDecimal.ZERO;
-                    order.setPaidAmount(dto.getPaidAmount().max(existingPaid));
-                } else {
-                    order.setPaidAmount(dto.getPaidAmount());
-                }
-            } else if (order.getId() == null) {
+                order.setPaidAmount(dto.getPaidAmount());
+            } else {
                 order.setPaidAmount(BigDecimal.ZERO);
             }
             OrderStatus requestedStatus = dto.getStatus();
@@ -450,6 +492,7 @@ public class OrderService {
             lineItem.setProductSku(variant.getSku());
             lineItem.setQuantity(itemDto.getQuantity());
             lineItem.setUnitPrice(unitPrice);
+            lineItem.setCostPrice(variant.getImportPrice() != null ? variant.getImportPrice() : BigDecimal.ZERO);
             lineItem.setSubtotal(subtotal);
             lineItem.setOrder(order);
             lineItems.add(lineItem);
@@ -539,14 +582,23 @@ public class OrderService {
         return "SUCCESS";
     }
 
-    // Hoàn thành thanh toán đơn hàng bằng ID (sử dụng cho luồng POS thủ công/online
-    // tối giản)
     @Transactional
     public ResOrderDTO completeOrderPaymentById(Integer id, String paymentMethod, BigDecimal paidAmount) {
+        return completeOrderPaymentById(id, paymentMethod, paidAmount, null);
+    }
+
+    @Transactional
+    public ResOrderDTO completeOrderPaymentById(Integer id, String paymentMethod, BigDecimal paidAmount, String cashierUsername) {
         Order order = orderRepository.findByIdWithPessimisticLock(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Đơn hàng ID " + id + " không tồn tại"));
         if (order.getStatus() != OrderStatus.PENDING) {
             return mapToResOrderDTO(order, orderLineItemRepository.findByOrderId(id));
+        }
+
+        if (cashierUsername != null && !cashierUsername.isBlank()) {
+            order.setCashierUsername(cashierUsername);
+        } else if (order.getCashierUsername() == null) {
+            order.setCashierUsername(order.getCreatedByUsername());
         }
 
         BigDecimal currentPaid = order.getPaidAmount() != null ? order.getPaidAmount() : BigDecimal.ZERO;
@@ -630,6 +682,7 @@ public class OrderService {
                 .customerName(savedOrder.getCustomerName())
                 .createdById(savedOrder.getCreatedBy())
                 .createdByUsername(savedOrder.getCreatedByUsername())
+                .cashierUsername(savedOrder.getCashierUsername() != null ? savedOrder.getCashierUsername() : savedOrder.getCreatedByUsername())
                 .totalAmount(savedOrder.getTotalAmount())
                 .paidAmount(savedOrder.getPaidAmount())
                 .changeAmount(savedOrder.getChangeAmount())
