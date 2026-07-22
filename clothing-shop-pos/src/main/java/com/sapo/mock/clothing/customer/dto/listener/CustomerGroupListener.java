@@ -36,14 +36,17 @@ public class CustomerGroupListener {
         Customer customer = customerRepository.findByIdWithPessimisticLock(event.getCustomerId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy khách hàng khi xử lý nâng hạng tự động"));
 
-        // 2. Cộng dồn doanh số mua hàng mới (hoặc trừ đi nếu trả hàng)
+        // 2. Cộng dồn doanh số mua hàng mới vào tổng chi tiêu cả đời
         BigDecimal currentSpent = customer.getTotalSpent() != null ? customer.getTotalSpent() : BigDecimal.ZERO;
         BigDecimal newTotalSpent = currentSpent.add(event.getOrderAmount());
         customer.setTotalSpent(newTotalSpent);
 
-        // 3. Gọi hàm bốc về List các nhóm phù hợp với newTotalSpent
+        // 3. Tính tổng chi tiêu trong 365 ngày gần nhất để xét hạng thành viên (đồng bộ với Cronjob hạ hạng)
+        java.time.Instant oneYearAgo = java.time.Instant.now().minus(365, java.time.temporal.ChronoUnit.DAYS);
+        BigDecimal spendingInLastYear = customerRepository.calculateSpendingInTimeRange(customer.getId(), oneYearAgo);
+
         List<CustomerGroup> suitableGroups = customerGroupRepository.findSuitableGroup(
-                newTotalSpent,
+                spendingInLastYear,
                 CustomerStatusEnum.ACTIVE
         );
 

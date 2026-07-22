@@ -89,7 +89,7 @@ public class UserService {
 		int pin = (int) (Math.random() * 900000) + 100000;
 		String plainPin = String.valueOf(pin);
 		
-		user.setSecurityPin(plainPin); // Luu plaintext
+		user.setSecurityPin(passwordEncoder.encode(plainPin)); // Mã hóa băm BCrypt
 		userRepository.save(user);
 		
 		return plainPin;
@@ -104,16 +104,16 @@ public class UserService {
 		if (newPin == null || !newPin.matches("\\d{6}")) {
 			throw new RuntimeException("Mã PIN phải bao gồm 6 chữ số");
 		}
-		user.setSecurityPin(newPin); // Luu plaintext
+		user.setSecurityPin(passwordEncoder.encode(newPin)); // Mã hóa băm BCrypt
 		userRepository.save(user);
 	}
 
-	public String getSecurityPin(String username) {
+	public boolean hasSecurityPin(String username) {
 		User user = userRepository.findByUsername(username);
 		if (user == null) {
 			throw new RuntimeException("User không tồn tại");
 		}
-		return user.getSecurityPin();
+		return user.getSecurityPin() != null && !user.getSecurityPin().isBlank();
 	}
 
 	@CacheEvict(value = "users", key = "#username")

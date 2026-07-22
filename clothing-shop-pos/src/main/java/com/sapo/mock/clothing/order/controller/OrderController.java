@@ -95,7 +95,8 @@ public class OrderController {
             @PathVariable Integer id,
             @RequestParam String paymentMethod,
             @RequestParam(required = false) java.math.BigDecimal paidAmount) throws IdInvalidException {
-        ResOrderDTO completedOrder = orderService.completeOrderPaymentById(id, paymentMethod, paidAmount);
+        String username = SecurityUtil.getCurrentUserLogin().orElse(null);
+        ResOrderDTO completedOrder = orderService.completeOrderPaymentById(id, paymentMethod, paidAmount, username);
         return ResponseEntity.ok(completedOrder);
     }
 }

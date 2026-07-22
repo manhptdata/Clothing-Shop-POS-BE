@@ -25,6 +25,7 @@ public class ResReturnOrderDTO {
     private String createdByUsername;
     private String approvedByUsername;
     private BigDecimal totalRefundAmount;
+    private String refundMethod;
     private String reason;
     private Instant createdAt;
     private Instant updatedAt;
@@ -43,5 +44,6 @@ public class ResReturnOrderDTO {
         private int quantity;
         private BigDecimal refundPrice;
         private BigDecimal subtotal;
+        private boolean isRestocked;
     }
 }

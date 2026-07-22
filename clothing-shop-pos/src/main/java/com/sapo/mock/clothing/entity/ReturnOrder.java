@@ -54,6 +54,9 @@ public class ReturnOrder {
     @Column(name = "total_refund_amount", nullable = false, precision = 15, scale = 2)
     private BigDecimal totalRefundAmount;
 
+    @Column(name = "refund_method", length = 30)
+    private String refundMethod;
+
     @Column(columnDefinition = "TEXT")
     private String reason;
 

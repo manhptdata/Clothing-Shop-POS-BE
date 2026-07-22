@@ -21,6 +21,7 @@ public class SystemSettingServiceImpl implements SystemSettingService {
     public static final String SETTING_PAYMENT_BANK_ACCOUNT = "PAYMENT_BANK_ACCOUNT";
     public static final String SETTING_PAYMENT_ACCOUNT_NAME = "PAYMENT_ACCOUNT_NAME";
     public static final String SETTING_MAX_PENDING_ORDERS = "MAX_PENDING_ORDERS_PER_CUSTOMER";
+    public static final String SETTING_PENDING_ORDER_TIMEOUT = "PENDING_ORDER_TIMEOUT_MINUTES";
 
     @Override
     public List<SystemSetting> getAllSettings() {
@@ -49,6 +50,8 @@ public class SystemSettingServiceImpl implements SystemSettingService {
                 newSetting.setDescription("Tên chủ tài khoản ngân hàng thụ hưởng");
             } else if (SETTING_MAX_PENDING_ORDERS.equals(key)) {
                 newSetting.setDescription("Số đơn hàng PENDING tối đa mà một khách hàng được phép sở hữu cùng lúc");
+            } else if (SETTING_PENDING_ORDER_TIMEOUT.equals(key)) {
+                newSetting.setDescription("Thời gian tự động hủy đơn hàng chờ thanh toán chưa cọc (Phút)");
             }
             return newSetting;
         });
@@ -80,6 +83,19 @@ public class SystemSettingServiceImpl implements SystemSettingService {
             return Integer.parseInt(setting.getSettingValue().trim());
         } catch (NumberFormatException e) {
             return 3;
+        }
+    }
+
+    @Override
+    public int getPendingOrderTimeoutMinutes() {
+        SystemSetting setting = getSettingByKey(SETTING_PENDING_ORDER_TIMEOUT);
+        if (setting == null || setting.getSettingValue() == null || setting.getSettingValue().isBlank()) {
+            return 30; // Mặc định là 30 phút nếu chưa cấu hình
+        }
+        try {
+            return Integer.parseInt(setting.getSettingValue().trim());
+        } catch (NumberFormatException e) {
+            return 30;
         }
     }
 }

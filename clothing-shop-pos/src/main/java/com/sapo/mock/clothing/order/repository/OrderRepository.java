@@ -34,23 +34,32 @@ public interface OrderRepository extends JpaRepository<Order, Integer>, JpaSpeci
     @Query("SELECT COALESCE(SUM(COALESCE(o.paidAmount, 0) - COALESCE(o.changeAmount, 0)), 0) FROM Order o " +
            "WHERE o.status IN (com.sapo.mock.clothing.util.constant.OrderStatus.COMPLETED, com.sapo.mock.clothing.util.constant.OrderStatus.PARTIALLY_RETURNED, com.sapo.mock.clothing.util.constant.OrderStatus.RETURNED) " +
            "AND o.paymentMethod = com.sapo.mock.clothing.util.constant.PaymentMethod.CASH " +
-           "AND o.createdByUsername = :username AND o.createdAt >= :start")
-    BigDecimal calculateUserCashSalesToday(@Param("username") String username, @Param("start") Instant start);
+           "AND COALESCE(o.cashierUsername, o.createdByUsername) = :username AND o.createdAt BETWEEN :start AND :end")
+    BigDecimal calculateUserCashSalesBetween(@Param("username") String username, @Param("start") Instant start, @Param("end") Instant end);
 
     @Query("SELECT COALESCE(SUM(ro.totalRefundAmount), 0) FROM ReturnOrder ro " +
-           "WHERE ro.createdByUsername = :username AND ro.createdAt >= :start")
-    BigDecimal calculateUserRefundsToday(@Param("username") String username, @Param("start") Instant start);
+           "WHERE ro.createdByUsername = :username AND ro.createdAt BETWEEN :start AND :end AND (ro.refundMethod = 'CASH' OR ro.refundMethod IS NULL)")
+    BigDecimal calculateUserCashRefundsBetween(@Param("username") String username, @Param("start") Instant start, @Param("end") Instant end);
+
+    default BigDecimal calculateUserRevenueBetween(String username, Instant start, Instant end) {
+        BigDecimal sales = calculateUserCashSalesBetween(username, start, end);
+        BigDecimal cashRefunds = calculateUserCashRefundsBetween(username, start, end);
+        return (sales != null ? sales : BigDecimal.ZERO).subtract(cashRefunds != null ? cashRefunds : BigDecimal.ZERO);
+    }
 
     default BigDecimal calculateUserRevenueToday(String username, Instant start) {
-        BigDecimal sales = calculateUserCashSalesToday(username, start);
-        BigDecimal refunds = calculateUserRefundsToday(username, start);
-        return (sales != null ? sales : BigDecimal.ZERO).subtract(refunds != null ? refunds : BigDecimal.ZERO);
+        return calculateUserRevenueBetween(username, start, Instant.now());
     }
 
     @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o " +
            "WHERE o.status IN (com.sapo.mock.clothing.util.constant.OrderStatus.COMPLETED, com.sapo.mock.clothing.util.constant.OrderStatus.PARTIALLY_RETURNED, com.sapo.mock.clothing.util.constant.OrderStatus.RETURNED) " +
            "AND o.createdAt BETWEEN :start AND :end")
     BigDecimal calculateTotalSalesBetween(@Param("start") Instant start, @Param("end") Instant end);
+
+    @Query("SELECT COALESCE(SUM(oli.costPrice * oli.quantity), 0) FROM OrderLineItem oli " +
+           "WHERE oli.order.status IN (com.sapo.mock.clothing.util.constant.OrderStatus.COMPLETED, com.sapo.mock.clothing.util.constant.OrderStatus.PARTIALLY_RETURNED, com.sapo.mock.clothing.util.constant.OrderStatus.RETURNED) " +
+           "AND oli.order.createdAt BETWEEN :start AND :end")
+    BigDecimal calculateTotalCogsBetween(@Param("start") Instant start, @Param("end") Instant end);
 
     @Query("SELECT COALESCE(SUM(ro.totalRefundAmount), 0) FROM ReturnOrder ro " +
            "WHERE ro.createdAt BETWEEN :start AND :end")

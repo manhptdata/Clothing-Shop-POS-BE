@@ -2,6 +2,7 @@ package com.sapo.mock.clothing.statistic.service.impl;
 
 import com.sapo.mock.clothing.customer.repository.CustomerRepository;
 import com.sapo.mock.clothing.order.repository.OrderRepository;
+import com.sapo.mock.clothing.returnorder.repository.ReturnOrderRepository;
 import com.sapo.mock.clothing.statistic.dto.response.DailyStatisticItemResponse;
 import com.sapo.mock.clothing.statistic.dto.response.DailyStatisticResponse;
 import com.sapo.mock.clothing.statistic.service.StatisticService;
@@ -22,6 +23,7 @@ public class StatisticServiceImpl implements StatisticService {
 
     private final OrderRepository orderRepository;
     private final CustomerRepository customerRepository;
+    private final ReturnOrderRepository returnOrderRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -35,10 +37,15 @@ public class StatisticServiceImpl implements StatisticService {
             dailyRevenue = BigDecimal.ZERO;
         }
 
+        BigDecimal grossCogs = orderRepository.calculateTotalCogsBetween(startOfDay, endOfDay);
+        BigDecimal restockedCogs = returnOrderRepository.calculateRestockedCogsBetween(startOfDay, endOfDay);
+        BigDecimal dailyCogs = (grossCogs != null ? grossCogs : BigDecimal.ZERO).subtract(restockedCogs != null ? restockedCogs : BigDecimal.ZERO);
+        BigDecimal dailyProfit = dailyRevenue.subtract(dailyCogs);
+
         long newCustomers = customerRepository.countByCreatedAtBetween(startOfDay, endOfDay);
         long newOrders = orderRepository.countByCreatedAtBetween(startOfDay, endOfDay);
 
-        return new DailyStatisticResponse(dailyRevenue, newCustomers, newOrders);
+        return new DailyStatisticResponse(dailyRevenue, dailyCogs, dailyProfit, newCustomers, newOrders);
     }
 
     @Override
@@ -58,9 +65,14 @@ public class StatisticServiceImpl implements StatisticService {
                 revenue = BigDecimal.ZERO;
             }
 
+            BigDecimal grossCogs = orderRepository.calculateTotalCogsBetween(startOfDay, endOfDay);
+            BigDecimal restockedCogs = returnOrderRepository.calculateRestockedCogsBetween(startOfDay, endOfDay);
+            BigDecimal cogs = (grossCogs != null ? grossCogs : BigDecimal.ZERO).subtract(restockedCogs != null ? restockedCogs : BigDecimal.ZERO);
+            BigDecimal profit = revenue.subtract(cogs);
+
             long orderCount = orderRepository.countByCreatedAtBetween(startOfDay, endOfDay);
 
-            weeklyStats.add(new DailyStatisticItemResponse(targetDate, revenue, orderCount));
+            weeklyStats.add(new DailyStatisticItemResponse(targetDate, revenue, cogs, profit, orderCount));
         }
 
         return weeklyStats;

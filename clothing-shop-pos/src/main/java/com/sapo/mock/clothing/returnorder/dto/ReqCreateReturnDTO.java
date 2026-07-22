@@ -18,6 +18,8 @@ public class ReqCreateReturnDTO {
 
     private String approvalPin;
 
+    private String refundMethod;
+
     @NotNull(message = "Danh sách sản phẩm trả không được trống")
     @Valid
     private List<ReturnItemDTO> items;
@@ -30,5 +32,7 @@ public class ReqCreateReturnDTO {
 
         @Min(value = 1, message = "Số lượng trả tối thiểu là 1")
         private int quantity;
+
+        private Boolean restock;
     }
 }

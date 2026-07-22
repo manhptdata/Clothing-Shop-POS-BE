@@ -45,9 +45,8 @@ public class User implements UserDetails {
 	@Column(unique = true, nullable = false, length = 50)
 	private String username;
 
-	@JsonProperty("password")
+	@JsonProperty(access = JsonProperty.Access.WRITE_ONLY, value = "password")
 	@NotBlank(message = "password không được để trống")
-//	@JsonIgnore
 	@Column(name = "password_hash", nullable = false)
 	private String passwordHash;
 

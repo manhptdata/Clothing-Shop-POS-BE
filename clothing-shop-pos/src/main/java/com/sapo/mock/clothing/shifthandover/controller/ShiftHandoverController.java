@@ -25,19 +25,83 @@ public class ShiftHandoverController {
 
     private final ShiftHandoverService shiftHandoverService;
 
+    // --- DANH MỤC CA LÀM VIỆC DÀNH CHO ADMIN & POS ---
+    @GetMapping("/configs")
+    @ApiMessage("Lấy danh mục ca làm việc thành công")
+    public ResponseEntity<List<com.sapo.mock.clothing.entity.ShiftConfig>> getActiveShiftConfigs() {
+        return ResponseEntity.ok(shiftHandoverService.getActiveShiftConfigs());
+    }
+
+    @PostMapping("/configs")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @ApiMessage("Thêm ca làm việc mới thành công")
+    public ResponseEntity<com.sapo.mock.clothing.entity.ShiftConfig> createShiftConfig(@RequestBody com.sapo.mock.clothing.entity.ShiftConfig config) {
+        return ResponseEntity.ok(shiftHandoverService.createShiftConfig(config));
+    }
+
+    @PutMapping("/configs/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @ApiMessage("Cập nhật ca làm việc thành công")
+    public ResponseEntity<com.sapo.mock.clothing.entity.ShiftConfig> updateShiftConfig(@PathVariable Integer id, @RequestBody com.sapo.mock.clothing.entity.ShiftConfig config) {
+        return ResponseEntity.ok(shiftHandoverService.updateShiftConfig(id, config));
+    }
+
+    @DeleteMapping("/configs/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @ApiMessage("Xóa ca làm việc thành công")
+    public ResponseEntity<Void> deactivateShiftConfig(@PathVariable Integer id) {
+        shiftHandoverService.deactivateShiftConfig(id);
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/active")
+    @ApiMessage("Lấy ca đang hoạt động thành công")
+    public ResponseEntity<ShiftHandover> getActiveShift() {
+        String username = SecurityUtil.getCurrentUserLogin()
+                .orElseThrow(() -> new BadRequestException("Vui lòng đăng nhập"));
+        ShiftHandover handover = shiftHandoverService.getActiveShift(username).orElse(null);
+        return ResponseEntity.ok(handover);
+    }
+
+    @PostMapping("/open")
+    @ApiMessage("Mở ca làm việc thành công")
+    public ResponseEntity<ShiftHandover> openShift(@Valid @RequestBody OpenShiftRequestDTO dto) {
+        String username = SecurityUtil.getCurrentUserLogin()
+                .orElseThrow(() -> new BadRequestException("Vui lòng đăng nhập"));
+        ShiftHandover handover = shiftHandoverService.openShift(username, dto.getShiftName(), dto.getInitialAmount());
+        return ResponseEntity.ok(handover);
+    }
+
     @PostMapping("/handover")
     @ApiMessage("Bàn giao ca thành công")
     public ResponseEntity<ShiftHandover> saveHandover(@Valid @RequestBody HandoverRequestDTO dto) {
         String username = SecurityUtil.getCurrentUserLogin()
                 .orElseThrow(() -> new BadRequestException("Vui lòng đăng nhập"));
 
-        ShiftHandover handover = shiftHandoverService.saveHandover(
+        ShiftHandover handover = shiftHandoverService.completeShift(
+                username,
+                dto.getInitialAmount(),
+                dto.getActualAmount(),
+                dto.getNote());
+        return ResponseEntity.ok(handover);
+    }
+
+    @GetMapping("/latest-system")
+    @ApiMessage("Lấy ca làm việc mới nhất toàn hệ thống")
+    public ResponseEntity<ShiftHandover> getLatestSystemShift() {
+        ShiftHandover handover = shiftHandoverService.getLatestSystemShift().orElse(null);
+        return ResponseEntity.ok(handover);
+    }
+
+    @PutMapping("/update-open")
+    @ApiMessage("Cập nhật thông tin ca đang mở thành công")
+    public ResponseEntity<ShiftHandover> updateOpenShift(@Valid @RequestBody OpenShiftRequestDTO dto) {
+        String username = SecurityUtil.getCurrentUserLogin()
+                .orElseThrow(() -> new BadRequestException("Vui lòng đăng nhập"));
+        ShiftHandover handover = shiftHandoverService.updateOpenShift(
                 username,
                 dto.getShiftName(),
-                dto.getSystemAmount(),
-                dto.getActualAmount(),
-                dto.getNote()
-        );
+                dto.getInitialAmount());
         return ResponseEntity.ok(handover);
     }
 
@@ -60,11 +124,20 @@ public class ShiftHandoverController {
 
     @Getter
     @Setter
-    public static class HandoverRequestDTO {
+    public static class OpenShiftRequestDTO {
         @NotBlank(message = "Tên ca không được để trống")
         private String shiftName;
 
-        @NotNull(message = "Doanh thu hệ thống không được để trống")
+        private BigDecimal initialAmount;
+    }
+
+    @Getter
+    @Setter
+    public static class HandoverRequestDTO {
+        private String shiftName;
+
+        private BigDecimal initialAmount;
+
         private BigDecimal systemAmount;
 
         @NotNull(message = "Tiền mặt thực tế không được để trống")

@@ -44,16 +44,16 @@ public class UserController {
     }
 
     @GetMapping("/me/security-pin")
-    @ApiMessage("Lấy mã PIN bảo mật thành công")
+    @ApiMessage("Lấy trạng thái mã PIN bảo mật thành công")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MANAGER')")
-    public ResponseEntity<Map<String, String>> getSecurityPin() {
+    public ResponseEntity<Map<String, Object>> getSecurityPin() {
         String username = SecurityUtil.getCurrentUserLogin()
                 .orElseThrow(() -> new RuntimeException("Vui lòng đăng nhập"));
         
-        String pin = userService.getSecurityPin(username);
+        boolean hasPin = userService.hasSecurityPin(username);
         
-        Map<String, String> response = new HashMap<>();
-        response.put("pin", pin);
+        Map<String, Object> response = new HashMap<>();
+        response.put("hasPin", hasPin);
         
         return ResponseEntity.ok(response);
     }
