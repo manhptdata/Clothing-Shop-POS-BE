@@ -277,27 +277,8 @@ public class ReturnOrderService {
                     .add(originalItem.getUnitPrice().multiply(BigDecimal.valueOf(returnItemDto.getQuantity())));
         }
 
-        BigDecimal unpenalizedCurrentRefund = computedRefundAmount;
-
-        // Cửa hàng chỉ hoàn lại số tiền thực tế khách đã trả (bao gồm cả tiền chuyển
-        // thừa)
-        BigDecimal previousRefundTotal = returnOrderRepository.getTotalRefundedByOrderId(order.getId());
-        if (previousRefundTotal == null) {
-            previousRefundTotal = BigDecimal.ZERO;
-        }
-
-        BigDecimal truePaidAmount = order.getPaidAmount() != null ? order.getPaidAmount() : BigDecimal.ZERO;
-        if (order.getChangeAmount() != null && order.getChangeAmount().compareTo(BigDecimal.ZERO) > 0) {
-            truePaidAmount = truePaidAmount.subtract(order.getChangeAmount());
-        }
-
-        BigDecimal remainingOrderPaidAmount = truePaidAmount.subtract(previousRefundTotal);
-        if (computedRefundAmount.compareTo(remainingOrderPaidAmount) > 0) {
-            computedRefundAmount = remainingOrderPaidAmount;
-        }
-
+        // --- 1. TÍNH TỔNG GIÁ TRỊ HÀNG HÓA ĐÃ TRẢ Ở CÁC LẦN TRƯỚC (NẾU CÓ) ---
         BigDecimal previousReturnedSubtotal = BigDecimal.ZERO;
-        BigDecimal previousUnpenalizedRefundTotal = BigDecimal.ZERO;
         for (ReturnOrder ro : existingReturns) {
             for (ReturnOrderLineItem item : ro.getItems()) {
                 OrderLineItem origItem = originalItemsMap.get(item.getVariantId());
@@ -305,65 +286,59 @@ public class ReturnOrderService {
                     previousReturnedSubtotal = previousReturnedSubtotal
                             .add(origItem.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())));
                 }
-                previousUnpenalizedRefundTotal = previousUnpenalizedRefundTotal.add(item.getSubtotal());
             }
         }
 
-        // Kiểm tra chặn nếu TRẢ 1 PHẦN làm rớt hóa đơn xuống dưới điều kiện Voucher
-        // Fix Issue 2: Giá trị đơn hàng mới tính dựa trên giá trị hàng hóa đã trả (chưa
-        // trừ phạt) thay vì tiền đã hoàn (đã trừ phạt)
-        BigDecimal newOrderValue = order.getTotalAmount().subtract(unpenalizedCurrentRefund)
-                .subtract(previousUnpenalizedRefundTotal);
-        if (newOrderValue.compareTo(BigDecimal.ZERO) < 0) {
-            newOrderValue = BigDecimal.ZERO;
-        }
-
+        // --- 2. THUẬT TOÁN FAIR PRICE (GIÁ TRỊ CÔNG BẰNG) CHUẨN E-COMMERCE ---
+        
+        // A. Giá trị nguyên bản (giá niêm yết) của phần hàng khách GIỮ LẠI sau lần trả này
         BigDecimal newSubtotal = originalSubtotal.subtract(previousReturnedSubtotal).subtract(returnedItemsSubtotal);
-
-        if (!isAllReturned && order.getVoucherCode() != null && !order.getVoucherCode().isBlank()) {
-            BigDecimal minOrderValue = null;
-            com.sapo.mock.clothing.entity.CustomerVoucher appliedVoucher = customerVoucherRepository
-                    .findByOrderId(order.getId()).orElse(null);
-            if (appliedVoucher != null && appliedVoucher.getVoucher() != null) {
-                minOrderValue = appliedVoucher.getVoucher().getMinOrderValue();
-            } else {
-                com.sapo.mock.clothing.entity.Voucher publicVoucher = voucherRepository
-                        .findByCode(order.getVoucherCode()).orElse(null);
-                if (publicVoucher != null) {
-                    minOrderValue = publicVoucher.getMinOrderValue();
-                }
-            }
-            if (minOrderValue != null && newSubtotal.compareTo(minOrderValue) < 0) {
-                // Khấu trừ lại tiền giảm giá của Voucher (nếu có) vào số tiền hoàn trả cho
-                // khách thay vì chặn không cho trả
-                BigDecimal voucherDiscount = order.getDiscountFromVoucher() != null ? order.getDiscountFromVoucher()
-                        : BigDecimal.ZERO;
-                if (voucherDiscount.compareTo(BigDecimal.ZERO) > 0) {
-                    computedRefundAmount = computedRefundAmount.subtract(voucherDiscount);
-                    if (computedRefundAmount.compareTo(BigDecimal.ZERO) < 0) {
-                        computedRefundAmount = BigDecimal.ZERO;
-                    }
-                }
-            }
+        if (newSubtotal.compareTo(BigDecimal.ZERO) < 0) {
+            newSubtotal = BigDecimal.ZERO;
         }
 
-        // Khấu trừ điểm và doanh số chi tiêu của khách hàng (Nếu không phải Khách vãng
-        // lai)
+        // B. Tính Giá trị công bằng (Fair Price) của phần hàng GIỮ LẠI ở LẦN TRẢ NÀY
+        BigDecimal fairPriceOfKeptItems = calculateFairPriceForSubtotal(order, originalSubtotal, newSubtotal);
+
+        // C. Tính Giá trị công bằng (Fair Price) của phần hàng GIỮ LẠI ở LẦN TRẢ TRƯỚC (Dùng cho khấu trừ điểm)
+        BigDecimal previousKeptSubtotal = originalSubtotal.subtract(previousReturnedSubtotal);
+        if (previousKeptSubtotal.compareTo(BigDecimal.ZERO) < 0) {
+            previousKeptSubtotal = BigDecimal.ZERO;
+        }
+        BigDecimal previousFairPriceOfKeptItems = calculateFairPriceForSubtotal(order, originalSubtotal, previousKeptSubtotal);
+
+        // D. Tính số tiền thực tế khách ĐÃ ĐÓNG cho toàn bộ đơn hàng (True Paid Amount)
+        BigDecimal truePaidAmount = order.getPaidAmount() != null ? order.getPaidAmount() : BigDecimal.ZERO;
+        if (order.getChangeAmount() != null && order.getChangeAmount().compareTo(BigDecimal.ZERO) > 0) {
+            truePaidAmount = truePaidAmount.subtract(order.getChangeAmount());
+        }
+
+        // E. Tổng số tiền CẦN hoàn lại qua tất cả các đợt trả hàng
+        BigDecimal totalExpectedRefund = truePaidAmount.subtract(fairPriceOfKeptItems);
+
+        // F. Lấy tổng số tiền ĐÃ HOÀN ở các đợt trước
+        BigDecimal previousRefundTotal = returnOrderRepository.getTotalRefundedByOrderId(order.getId());
+        if (previousRefundTotal == null) {
+            previousRefundTotal = BigDecimal.ZERO;
+        }
+
+        // G. Số tiền thực tế hoàn cho khách ở đợt trả này
+        BigDecimal actualRefundForThisTurn = totalExpectedRefund.subtract(previousRefundTotal);
+        if (actualRefundForThisTurn.compareTo(BigDecimal.ZERO) < 0) {
+            actualRefundForThisTurn = BigDecimal.ZERO;
+        }
+
+        computedRefundAmount = actualRefundForThisTurn;
+        BigDecimal newOrderValue = fairPriceOfKeptItems; // Cập nhật để dùng bên dưới
+
+        // --- 3. KHẤU TRỪ ĐIỂM VÀ DOANH SỐ CHI TIÊU CỦA KHÁCH HÀNG ---
         if (customer.getId() != 1) {
-            // Re-fetch với Pessimistic Lock trước khi thạo tác điểm thưởng để tránh Lost
-            // Update
             Customer lockedCustomer = customerRepository.findByIdWithPessimisticLock(customer.getId())
-                    .orElseThrow(
-                            () -> new ResourceNotFoundException("Không tìm thấy khách hàng ID: " + customer.getId()));
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng ID: " + customer.getId()));
 
-            // 1. Hoàn lại điểm tiêu dùng theo tỷ lệ phần giá trị trả lại (Proportional
-            // Refund)
-            if (order.getPointsUsed() > 0) {
-                BigDecimal returnRatio = BigDecimal.ZERO;
-                if (originalSubtotal.compareTo(BigDecimal.ZERO) > 0) {
-                    returnRatio = returnedItemsSubtotal.divide(originalSubtotal, 4, RoundingMode.HALF_UP);
-                }
-
+            // 3.1 Hoàn lại điểm tiêu dùng theo tỷ lệ phần hàng trả
+            if (order.getPointsUsed() > 0 && originalSubtotal.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal returnRatio = returnedItemsSubtotal.divide(originalSubtotal, 4, RoundingMode.HALF_UP);
                 int pointsToRefund = BigDecimal.valueOf(order.getPointsUsed()).multiply(returnRatio).intValue();
 
                 if (pointsToRefund > 0) {
@@ -378,26 +353,15 @@ public class ReturnOrderService {
                 }
             }
 
-            // 2. Khấu trừ điểm bằng công thức Chống Sai Số (Trả nhiều lần) - Fix Issue 3
-            // (Double-Penalize)
-            // Tính số điểm ĐÁNG LẼ phải trừ của các lần trước (dựa trên giá trị hàng hóa
-            // trả lại chưa trừ phạt)
-            BigDecimal previousNewOrderValue = order.getTotalAmount().subtract(previousUnpenalizedRefundTotal);
-            if (previousNewOrderValue.compareTo(BigDecimal.ZERO) < 0)
-                previousNewOrderValue = BigDecimal.ZERO;
-            int previousEarnedPoints = previousNewOrderValue.divideToIntegralValue(PointConstant.EARN_RATE).intValue();
+            // 3.2 Khấu trừ điểm tích lũy dựa trên Fair Price đồng bộ
+            int previousEarnedPoints = previousFairPriceOfKeptItems.divideToIntegralValue(PointConstant.EARN_RATE).intValue();
             int previousTheoreticalDeducted = order.getPointsEarned() - previousEarnedPoints;
-            if (previousTheoreticalDeducted < 0)
-                previousTheoreticalDeducted = 0;
+            if (previousTheoreticalDeducted < 0) previousTheoreticalDeducted = 0;
 
-            // Tính TỔNG số điểm phải trừ tính đến hiện tại
             int currentEarnedPoints = newOrderValue.divideToIntegralValue(PointConstant.EARN_RATE).intValue();
             int currentTheoreticalDeductedTotal = order.getPointsEarned() - currentEarnedPoints;
-            if (currentTheoreticalDeductedTotal < 0)
-                currentTheoreticalDeductedTotal = 0;
+            if (currentTheoreticalDeductedTotal < 0) currentTheoreticalDeductedTotal = 0;
 
-            // Số điểm thực sự cần trừ CỦA LẦN NÀY (Bao gồm cả điểm bù bằng tiền mặt hoặc
-            // điểm ví)
             int pointsToDeduct = currentTheoreticalDeductedTotal - previousTheoreticalDeducted;
             if (pointsToDeduct > 0) {
                 int currentPoints = lockedCustomer.getRewardPoints();
@@ -411,6 +375,14 @@ public class ReturnOrderService {
                     phDeduct.setType(PointConstant.TYPE_REFUND);
                     phDeduct.setDescription("Khấu trừ toàn bộ điểm hiện có do khách trả hàng đơn " + order.getOrderNumber());
                     pointHistoryRepository.save(phDeduct);
+
+                    // Trừ phần điểm thâm hụt trực tiếp vào số tiền thối cho khách
+                    int pointsDeficit = pointsToDeduct - currentPoints;
+                    BigDecimal moneyToDeduct = BigDecimal.valueOf(pointsDeficit).multiply(PointConstant.REDEEM_RATE);
+                    computedRefundAmount = computedRefundAmount.subtract(moneyToDeduct);
+                    if (computedRefundAmount.compareTo(BigDecimal.ZERO) < 0) {
+                        computedRefundAmount = BigDecimal.ZERO;
+                    }
                 } else {
                     lockedCustomer.setRewardPoints(currentPoints - pointsToDeduct);
 
@@ -425,10 +397,8 @@ public class ReturnOrderService {
             }
             customerRepository.save(lockedCustomer);
 
-            // Gửi sự kiện cập nhật tổng chi tiêu (event với số tiền âm) để recheck nâng/hạ
-            // hạng tự động
-            eventPublisher
-                    .publishEvent(new OrderCompletedEvent(lockedCustomer.getId(), unpenalizedCurrentRefund.negate()));
+            // 3.3 Cập nhật tổng chi tiêu của khách (Dùng con số tiền thối thực tế computedRefundAmount)
+            eventPublisher.publishEvent(new OrderCompletedEvent(lockedCustomer.getId(), computedRefundAmount.negate()));
         }
 
         computedRefundAmount = computedRefundAmount.setScale(0, RoundingMode.HALF_UP);
@@ -519,4 +489,49 @@ public class ReturnOrderService {
                 .items(itemDTOs)
                 .build();
     }
+
+    private BigDecimal calculateFairPriceForSubtotal(Order order, BigDecimal originalSubtotal, BigDecimal keptSubtotal) {
+        if (keptSubtotal.compareTo(BigDecimal.ZERO) <= 0 || originalSubtotal.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+
+        // 1. Giảm giá từ Điểm thưởng cho phần hàng giữ lại
+        BigDecimal pointsDiscount = BigDecimal.ZERO;
+        if (order.getPointsUsed() > 0) {
+            pointsDiscount = BigDecimal.valueOf(order.getPointsUsed())
+                    .multiply(PointConstant.REDEEM_RATE)
+                    .multiply(keptSubtotal)
+                    .divide(originalSubtotal, 0, RoundingMode.HALF_UP);
+        }
+
+        // 2. Giảm giá từ Voucher cho phần hàng giữ lại
+        BigDecimal voucherDiscount = BigDecimal.ZERO;
+        if (order.getVoucherCode() != null && !order.getVoucherCode().isBlank()) {
+            BigDecimal minOrderValue = null;
+            com.sapo.mock.clothing.entity.CustomerVoucher appliedVoucher = customerVoucherRepository
+                    .findByOrderId(order.getId()).orElse(null);
+            if (appliedVoucher != null && appliedVoucher.getVoucher() != null) {
+                minOrderValue = appliedVoucher.getVoucher().getMinOrderValue();
+            } else {
+                com.sapo.mock.clothing.entity.Voucher publicVoucher = voucherRepository
+                        .findByCode(order.getVoucherCode()).orElse(null);
+                if (publicVoucher != null) {
+                    minOrderValue = publicVoucher.getMinOrderValue();
+                }
+            }
+
+            // ĐỦ ĐIỀU KIỆN MIN ORDER VALUE -> Được giữ tỷ lệ giảm giá Voucher
+            if (minOrderValue == null || keptSubtotal.compareTo(minOrderValue) >= 0) {
+                if (order.getDiscountFromVoucher() != null) {
+                    voucherDiscount = order.getDiscountFromVoucher()
+                            .multiply(keptSubtotal)
+                            .divide(originalSubtotal, 0, RoundingMode.HALF_UP);
+                }
+            }
+            // RỚT ĐIỀU KIỆN -> voucherDiscount tự động = 0 (khách mất hoàn toàn giảm giá Voucher)
+        }
+
+        BigDecimal fairPrice = keptSubtotal.subtract(pointsDiscount).subtract(voucherDiscount);
+        return fairPrice.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : fairPrice;
+        }
 }

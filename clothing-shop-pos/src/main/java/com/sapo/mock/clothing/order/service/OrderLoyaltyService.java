@@ -130,8 +130,8 @@ public class OrderLoyaltyService {
                 }
             }
 
-            // RESERVE: Chỉ tăng usedQuantity nếu đơn hàng được hoàn tất (COMPLETED) trực tiếp trong cùng luồng
-            if (!isSamePublicVoucher && order.getStatus() == OrderStatus.COMPLETED) {
+            // RESERVE: Áp dụng cơ chế Giữ chỗ (Reservation) cho mọi trạng thái đơn hàng (PENDING hoặc COMPLETED)
+            if (!isSamePublicVoucher) {
                 int rowsUpdated = voucherRepository.incrementUsedQuantity(code);
                 if (rowsUpdated == 0) {
                     throw new BadRequestException("Mã voucher này đã hết lượt sử dụng hoặc không khả dụng");
@@ -201,22 +201,8 @@ public class OrderLoyaltyService {
             lockedVoucher.setUsedAt(Instant.now());
             lockedVoucher.setOrderId(savedOrder.getId());
             customerVoucherRepository.save(lockedVoucher);
-        } else if (savedOrder.getVoucherCode() != null && !savedOrder.getVoucherCode().isBlank()) {
-            // Tăng usedQuantity của Public Voucher khi đơn hàng hoàn thành thanh toán
-            voucherRepository.incrementUsedQuantity(savedOrder.getVoucherCode());
-            if (customerParam != null && customerParam.getId() != 1) {
-                VoucherUsage usage = voucherUsageRepository.findByCustomerIdAndVoucherCodeWithPessimisticLock(customerParam.getId(), savedOrder.getVoucherCode())
-                        .orElseGet(() -> {
-                            VoucherUsage vu = new VoucherUsage();
-                            vu.setCustomerId(customerParam.getId());
-                            vu.setVoucherCode(savedOrder.getVoucherCode());
-                            vu.setUsageCount(0);
-                            return vu;
-                        });
-                usage.setUsageCount(usage.getUsageCount() + 1);
-                voucherUsageRepository.save(usage);
-            }
         }
+
 
         if (customerParam.getId() != 1) {
             // Re-fetch với Pessimistic Lock để đảm bảo không bị Lost Update
@@ -290,20 +276,18 @@ public class OrderLoyaltyService {
             appliedWalletVoucher.setOrderId(null);
             customerVoucherRepository.save(appliedWalletVoucher);
         } else if (savedOrder.getVoucherCode() != null && !savedOrder.getVoucherCode().isBlank()) {
-            if (savedOrder.getStatus() == OrderStatus.COMPLETED) {
-                // Hoàn lại số lượng đã sử dụng (usedQuantity) cho Public Voucher khi hủy đơn đã COMPLETED bằng Atomic SQL
-                voucherRepository.decrementUsedQuantity(savedOrder.getVoucherCode());
+            // NHẢ CHỖ (Release): Hoàn lại lượt sử dụng khi hủy đơn PENDING hoặc COMPLETED
+            voucherRepository.decrementUsedQuantity(savedOrder.getVoucherCode());
 
-                // Hoàn lại usageCount trong VoucherUsage cho khách hàng
-                if (customerParam != null && customerParam.getId() != 1) {
-                    voucherUsageRepository.findByCustomerIdAndVoucherCodeWithPessimisticLock(customerParam.getId(), savedOrder.getVoucherCode())
-                            .ifPresent(usage -> {
-                                if (usage.getUsageCount() != null && usage.getUsageCount() > 0) {
-                                    usage.setUsageCount(usage.getUsageCount() - 1);
-                                    voucherUsageRepository.save(usage);
-                                }
-                            });
-                }
+            // Hoàn lại usageCount trong VoucherUsage cho khách hàng
+            if (customerParam != null && customerParam.getId() != 1) {
+                voucherUsageRepository.findByCustomerIdAndVoucherCodeWithPessimisticLock(customerParam.getId(), savedOrder.getVoucherCode())
+                        .ifPresent(usage -> {
+                            if (usage.getUsageCount() != null && usage.getUsageCount() > 0) {
+                                usage.setUsageCount(usage.getUsageCount() - 1);
+                                voucherUsageRepository.save(usage);
+                            }
+                        });
             }
         }
     }

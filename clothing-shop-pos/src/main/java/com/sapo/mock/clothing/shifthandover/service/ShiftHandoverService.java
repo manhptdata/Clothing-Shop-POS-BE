@@ -75,6 +75,21 @@ public class ShiftHandoverService {
         return netRevenue;
     }
 
+    public BigDecimal getUserTransferRevenueToday(String username) {
+        Instant startOfDay = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant();
+        Instant openedAtTime = shiftHandoverRepository
+                .findFirstByCashierUsernameAndStatusOrderByCreatedAtDesc(username, "OPEN")
+                .map(s -> s.getOpenedAt() != null ? s.getOpenedAt() : s.getCreatedAt())
+                .orElseGet(() -> {
+                    return shiftHandoverRepository.findTopByCashierUsernameOrderByCreatedAtDesc(username)
+                            .map(s -> s.getOpenedAt() != null ? s.getOpenedAt() : s.getCreatedAt())
+                            .filter(t -> t.isAfter(startOfDay))
+                            .orElse(startOfDay);
+                });
+        BigDecimal netTransfer = orderRepository.calculateUserTransferRevenueBetween(username, openedAtTime, Instant.now());
+        return netTransfer != null ? netTransfer : BigDecimal.ZERO;
+    }
+
     public java.util.Optional<ShiftHandover> getActiveShift(String username) {
         return shiftHandoverRepository.findFirstByCashierUsernameAndStatusOrderByCreatedAtDesc(username, "OPEN");
     }
@@ -118,10 +133,12 @@ public class ShiftHandoverService {
         }
 
         BigDecimal systemAmount = getUserRevenueToday(cashierUsername);
+        BigDecimal transferAmount = getUserTransferRevenueToday(cashierUsername);
         BigDecimal expectedAmount = activeShift.getInitialAmount().add(systemAmount);
         BigDecimal discrepancy = actualAmount.subtract(expectedAmount);
 
         activeShift.setSystemAmount(systemAmount);
+        activeShift.setTransferAmount(transferAmount);
         activeShift.setActualAmount(actualAmount);
         activeShift.setDiscrepancy(discrepancy);
         activeShift.setNote(note);
@@ -138,16 +155,16 @@ public class ShiftHandoverService {
 
         String diffText;
         if (discrepancy.compareTo(BigDecimal.ZERO) > 0) {
-            diffText = String.format("Thừa %,.0fđ", discrepancy);
+            diffText = "thừa " + discrepancy + "đ";
         } else if (discrepancy.compareTo(BigDecimal.ZERO) < 0) {
-            diffText = String.format("Thiếu %,.0fđ", discrepancy.abs());
+            diffText = "thiếu " + discrepancy.abs() + "đ";
         } else {
-            diffText = "Khớp 100%";
+            diffText = "đúng két";
         }
 
         String msg = String.format(
-                "Ca [%s] (Nhân viên: %s) đã kết ca. Két ban đầu: %,.0fđ | Doanh thu hệ thống: %,.0fđ | Tiền đếm được: %,.0fđ (%s).",
-                activeShift.getShiftName(), cashierUsername, activeShift.getInitialAmount(), systemAmount, actualAmount,
+                "Ca [%s] (NV: %s) kết ca. Tiền mặt: %,.0fđ | CK: %,.0fđ | Két đầu ca: %,.0fđ | Tiền đếm thực tế: %,.0fđ (%s).",
+                activeShift.getShiftName(), cashierUsername, systemAmount, transferAmount, activeShift.getInitialAmount(), actualAmount,
                 diffText);
         if (note != null && !note.trim().isEmpty()) {
             msg += " Ghi chú: " + note;

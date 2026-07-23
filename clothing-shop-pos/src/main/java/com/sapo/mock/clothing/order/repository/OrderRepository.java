@@ -47,6 +47,22 @@ public interface OrderRepository extends JpaRepository<Order, Integer>, JpaSpeci
         return (sales != null ? sales : BigDecimal.ZERO).subtract(cashRefunds != null ? cashRefunds : BigDecimal.ZERO);
     }
 
+    @Query("SELECT COALESCE(SUM(COALESCE(o.paidAmount, 0) - COALESCE(o.changeAmount, 0)), 0) FROM Order o " +
+           "WHERE o.status IN (com.sapo.mock.clothing.util.constant.OrderStatus.COMPLETED, com.sapo.mock.clothing.util.constant.OrderStatus.PARTIALLY_RETURNED, com.sapo.mock.clothing.util.constant.OrderStatus.RETURNED) " +
+           "AND o.paymentMethod = com.sapo.mock.clothing.util.constant.PaymentMethod.QR_SEPAY " +
+           "AND COALESCE(o.cashierUsername, o.createdByUsername) = :username AND o.createdAt BETWEEN :start AND :end")
+    BigDecimal calculateUserTransferSalesBetween(@Param("username") String username, @Param("start") Instant start, @Param("end") Instant end);
+
+    @Query("SELECT COALESCE(SUM(ro.totalRefundAmount), 0) FROM ReturnOrder ro " +
+           "WHERE ro.createdByUsername = :username AND ro.createdAt BETWEEN :start AND :end AND ro.refundMethod = 'TRANSFER'")
+    BigDecimal calculateUserTransferRefundsBetween(@Param("username") String username, @Param("start") Instant start, @Param("end") Instant end);
+
+    default BigDecimal calculateUserTransferRevenueBetween(String username, Instant start, Instant end) {
+        BigDecimal sales = calculateUserTransferSalesBetween(username, start, end);
+        BigDecimal transferRefunds = calculateUserTransferRefundsBetween(username, start, end);
+        return (sales != null ? sales : BigDecimal.ZERO).subtract(transferRefunds != null ? transferRefunds : BigDecimal.ZERO);
+    }
+
     default BigDecimal calculateUserRevenueToday(String username, Instant start) {
         return calculateUserRevenueBetween(username, start, Instant.now());
     }

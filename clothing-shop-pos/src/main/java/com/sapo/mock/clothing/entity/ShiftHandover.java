@@ -35,6 +35,9 @@ public class ShiftHandover {
     @Column(name = "discrepancy", nullable = false)
     private BigDecimal discrepancy = BigDecimal.ZERO; // Chênh lệch (actual - system)
 
+    @Column(name = "transfer_amount", nullable = false)
+    private BigDecimal transferAmount = BigDecimal.ZERO; // Tiền chuyển khoản (QR_SEPAY)
+
     @Column(name = "status", nullable = false, length = 20)
     private String status = "COMPLETED"; // OPEN, COMPLETED
 

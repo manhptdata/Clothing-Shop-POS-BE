@@ -275,64 +275,8 @@ public class StockReceiptService implements IStockReceiptService {
 			throw new BadRequestException("Phiếu nhập đã bị hủy trước đó");
 		}
 
-		// Nếu phiếu đang ở CONFIRMED, trừ tồn kho và rollback giá vốn MAC
 		if (receipt.getStatus() == ReceiptStatus.CONFIRMED) {
-			// Anti-deadlock: Sắp xếp items theo variant ID tăng dần
-			List<StockReceiptItem> sortedCancelItems = new ArrayList<>(receipt.getItems());
-			sortedCancelItems.sort(java.util.Comparator.comparing(i -> i.getVariant().getId()));
-
-			for (StockReceiptItem item : sortedCancelItems) {
-				ProductVariant variant = variantRepository.findByIdWithPessimisticLock(item.getVariant().getId()).orElseThrow(
-						() -> new BadRequestException("Không tìm thấy biến thể SP ID: " + item.getVariant().getId()));
-
-				int oldQuantity = variant.getQuantity() != null ? variant.getQuantity() : 0;
-				int newQuantity = oldQuantity - item.getQuantity();
-
-				if (newQuantity < 0) {
-					throw new BadRequestException("Không thể hủy phiếu nhập: Tồn kho của sản phẩm '" + variant.getSku() + "' không đủ để trừ (còn " + oldQuantity + ", cần trừ " + item.getQuantity() + ").");
-				}
-
-				// Tính toán rollback giá vốn bình quân gia quyền di động (MAC)
-				BigDecimal currentImportPrice = variant.getImportPrice() != null ? variant.getImportPrice() : BigDecimal.ZERO;
-				BigDecimal itemImportPrice = item.getImportPrice() != null ? item.getImportPrice() : BigDecimal.ZERO;
-				BigDecimal newImportPrice = currentImportPrice;
-
-				if (newQuantity > 0 && oldQuantity > item.getQuantity()) {
-					BigDecimal totalCurrentValue = currentImportPrice.multiply(BigDecimal.valueOf(oldQuantity));
-					BigDecimal totalItemValue = itemImportPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
-					BigDecimal remainingValue = totalCurrentValue.subtract(totalItemValue);
-					BigDecimal remainingQty = BigDecimal.valueOf(newQuantity);
-					if (remainingValue.compareTo(BigDecimal.ZERO) < 0 || remainingQty.compareTo(BigDecimal.ZERO) <= 0) {
-						// BẢO VỆ KHO: Nếu phép tính lùi MAC cho ra số tiền âm (hoặc chia cho 0) do đã phát sinh doanh số.
-						// Ta giữ nguyên giá trị MAC hiện tại để kho không bị sập giá vốn.
-						newImportPrice = currentImportPrice;
-					} else {
-						newImportPrice = remainingValue.divide(remainingQty, 2, RoundingMode.HALF_UP);
-					}
-				}
-
-				// Cập nhật biến thể
-				variant.setQuantity(newQuantity);
-				variant.setImportPrice(newImportPrice);
-				variantRepository.save(variant);
-
-				// Ghi Audit Trail
-				StockLog log = new StockLog();
-				log.setVariant(variant);
-				log.setQuantityBefore(oldQuantity);
-				log.setQuantityChange(-item.getQuantity());
-				log.setQuantityAfter(newQuantity);
-				log.setReferenceId(receipt.getId());
-				log.setReferenceType(StockLogReferenceType.RECEIPT);
-				log.setSource(StockLogSource.DIEU_CHINH);
-				log.setNote("Hủy duyệt phiếu nhập " + receipt.getCode());
-
-				if (userId != null) {
-					log.setCreatedBy(userRepository.getReferenceById(userId));
-				}
-
-				stockLogRepository.save(log);
-			}
+			throw new BadRequestException("Không thể hủy Phiếu Nhập đã được Duyệt. Để đảm bảo tính toàn vẹn của Giá Vốn (MAC) và Kế toán, vui lòng sử dụng chức năng Trả Hàng Cho Nhà Cung Cấp hoặc Điều Chỉnh Kho (Kiểm kê).");
 		}
 
 		receipt.setStatus(ReceiptStatus.CANCELLED);
