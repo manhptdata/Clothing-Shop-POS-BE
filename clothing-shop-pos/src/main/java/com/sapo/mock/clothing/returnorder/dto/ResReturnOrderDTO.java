@@ -1,5 +1,6 @@
 package com.sapo.mock.clothing.returnorder.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -44,6 +45,8 @@ public class ResReturnOrderDTO {
         private int quantity;
         private BigDecimal refundPrice;
         private BigDecimal subtotal;
+
+        @JsonProperty("isRestocked")
         private boolean isRestocked;
     }
 }
