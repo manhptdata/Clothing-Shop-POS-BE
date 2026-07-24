@@ -7,6 +7,7 @@ import com.sapo.mock.clothing.customer.repository.CustomerVoucherRepository;
 import com.sapo.mock.clothing.customer.repository.PointHistoryRepository;
 import com.sapo.mock.clothing.customer.repository.VoucherRepository;
 import com.sapo.mock.clothing.entity.Customer;
+import com.sapo.mock.clothing.entity.Notification;
 import com.sapo.mock.clothing.entity.Order;
 import com.sapo.mock.clothing.entity.OrderLineItem;
 import com.sapo.mock.clothing.entity.PointHistory;
@@ -16,6 +17,7 @@ import com.sapo.mock.clothing.entity.ReturnOrderLineItem;
 import com.sapo.mock.clothing.entity.User;
 import com.sapo.mock.clothing.exception.BadRequestException;
 import com.sapo.mock.clothing.exception.ResourceNotFoundException;
+import com.sapo.mock.clothing.notification.service.NotificationService;
 import com.sapo.mock.clothing.order.repository.OrderLineItemRepository;
 import com.sapo.mock.clothing.order.repository.OrderRepository;
 import com.sapo.mock.clothing.product.repository.ProductVariantRepository;
@@ -73,6 +75,7 @@ public class ReturnOrderService {
     private final SystemSettingService systemSettingService;
     private final PasswordEncoder passwordEncoder;
     private final OrderLoyaltyService orderLoyaltyService;
+    private final NotificationService notificationService;
 
     @Transactional
     public ResReturnOrderDTO createReturn(ReqCreateReturnDTO dto, String username) {
@@ -417,6 +420,18 @@ public class ReturnOrderService {
         }
 
         orderRepository.save(order);
+
+        try {
+            Notification notification = new Notification();
+            notification.setTitle("Phiếu trả hàng mới");
+            notification.setMessage("Đơn hàng " + order.getOrderNumber() + " vừa có phiếu trả hàng mới (Hoàn tiền: " + savedReturnOrder.getTotalRefundAmount() + "đ).");
+            notification.setType("RETURN_ORDER");
+            notification.setTargetRole("ROLE_ADMIN,ROLE_MANAGER,ROLE_CASHIER,ROLE_WH");
+            notification.setMetadata("{\"returnId\":" + savedReturnOrder.getId() + ",\"orderId\":" + order.getId() + "}");
+            notificationService.sendNotification(notification);
+        } catch (Exception e) {
+            System.err.println("Lỗi gửi thông báo trả hàng: " + e.getMessage());
+        }
 
         return mapToResReturnOrderDTO(savedReturnOrder, returnLineItems);
     }

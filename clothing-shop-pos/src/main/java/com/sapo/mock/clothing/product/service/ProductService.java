@@ -89,6 +89,7 @@ public class ProductService implements IProductService {
 		notification.setMessage("Sản phẩm '" + savedProduct.getName() + "' vừa được thêm mới vào hệ thống.");
 		notification.setType("SYSTEM");
 		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
+		notification.setMetadata("{\"productId\":" + savedProduct.getId() + "}");
 		notificationService.sendNotification(notification);
 		
 		return toProductResponse(savedProduct);
@@ -116,6 +117,7 @@ public class ProductService implements IProductService {
 		notification.setMessage("Sản phẩm '" + updatedProduct.getName() + "' vừa được cập nhật thông tin.");
 		notification.setType("SYSTEM");
 		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
+		notification.setMetadata("{\"productId\":" + updatedProduct.getId() + "}");
 		notificationService.sendNotification(notification);
 		
 		return toProductResponse(updatedProduct);
