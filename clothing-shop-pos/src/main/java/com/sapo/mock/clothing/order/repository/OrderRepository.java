@@ -94,4 +94,11 @@ public interface OrderRepository extends JpaRepository<Order, Integer>, JpaSpeci
     long countByCustomerIdAndStatus(Integer customerId, com.sapo.mock.clothing.util.constant.OrderStatus status);
 
     List<Order> findByStatusAndCreatedAtBefore(com.sapo.mock.clothing.util.constant.OrderStatus status, Instant createdAt);
+
+    @Query("SELECT o.paymentMethod, SUM(COALESCE(o.totalAmount, 0)) " +
+           "FROM Order o " +
+           "WHERE o.createdAt BETWEEN :start AND :end " +
+           "AND o.status IN (com.sapo.mock.clothing.util.constant.OrderStatus.COMPLETED, com.sapo.mock.clothing.util.constant.OrderStatus.PARTIALLY_RETURNED) " +
+           "GROUP BY o.paymentMethod")
+    List<Object[]> calculatePaymentMethodBreakdownBetween(@Param("start") Instant start, @Param("end") Instant end);
 }

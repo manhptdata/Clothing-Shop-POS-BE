@@ -109,6 +109,7 @@ public class StockReceiptService implements IStockReceiptService {
 		notification.setMessage("Phiếu nhập kho '" + savedReceipt.getCode() + "' vừa được tạo mới.");
 		notification.setType("SYSTEM");
 		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
+		notification.setMetadata("{\"receiptId\":" + savedReceipt.getId() + "}");
 		notificationService.sendNotification(notification);
 
 		return mapToResponse(savedReceipt);
@@ -172,6 +173,7 @@ public class StockReceiptService implements IStockReceiptService {
 		notification.setMessage("Phiếu nhập kho '" + savedReceipt.getCode() + "' vừa được cập nhật.");
 		notification.setType("SYSTEM");
 		notification.setTargetRole(NotificationConstants.TARGET_MANAGEMENT);
+		notification.setMetadata("{\"receiptId\":" + savedReceipt.getId() + "}");
 		notificationService.sendNotification(notification);
 
 		return mapToResponse(savedReceipt);

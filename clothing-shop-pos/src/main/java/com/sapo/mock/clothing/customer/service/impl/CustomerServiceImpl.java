@@ -10,9 +10,12 @@ import com.sapo.mock.clothing.customer.repository.CustomerVoucherRepository;
 import com.sapo.mock.clothing.customer.service.CustomerService;
 import com.sapo.mock.clothing.entity.Customer;
 import com.sapo.mock.clothing.entity.CustomerVoucher;
+import com.sapo.mock.clothing.entity.Notification;
 import com.sapo.mock.clothing.entity.Order;
 import com.sapo.mock.clothing.exception.BadRequestException;
 import com.sapo.mock.clothing.exception.ResourceNotFoundException;
+import com.sapo.mock.clothing.notification.service.NotificationService;
+import com.sapo.mock.clothing.order.repository.OrderRepository;
 import com.sapo.mock.clothing.util.constant.CustomerStatusEnum;
 import com.sapo.mock.clothing.util.constant.VoucherCampaignStatusEnum;
 import java.time.Instant;
@@ -36,7 +39,10 @@ public class CustomerServiceImpl implements CustomerService {
     private CustomerVoucherRepository customerVoucherRepository;
 
     @Autowired
-    private com.sapo.mock.clothing.order.repository.OrderRepository orderRepository;
+    private OrderRepository orderRepository;
+
+    @Autowired
+    private NotificationService notificationService;
 
     // Tìm kiếm khách hàng ACTIVE theo tên hoặc số điện thoại, trả về kết quả dưới dạng Page<CustomerResponse>.
     @Override
@@ -142,6 +148,19 @@ public class CustomerServiceImpl implements CustomerService {
         customer.setStatus(CustomerStatusEnum.ACTIVE);
 
         Customer savedCustomer = customerRepository.save(customer);
+
+        try {
+            Notification notification = new Notification();
+            notification.setTitle("Khách hàng mới");
+            notification.setMessage("Khách hàng '" + savedCustomer.getFullName() + "' (" + savedCustomer.getPhone() + ") vừa được đăng ký thành công.");
+            notification.setType("NEW_CUSTOMER");
+            notification.setTargetRole("ROLE_ADMIN,ROLE_MANAGER,ROLE_CASHIER");
+            notification.setMetadata("{\"customerId\":" + savedCustomer.getId() + "}");
+            notificationService.sendNotification(notification);
+        } catch (Exception e) {
+            System.err.println("Lỗi gửi thông báo khách hàng mới: " + e.getMessage());
+        }
+
         return convertToResponse(savedCustomer);
     }
 

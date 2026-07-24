@@ -3,10 +3,13 @@ package com.sapo.mock.clothing.voucher.service.impl;
 import com.sapo.mock.clothing.customer.dto.request.VoucherRequest;
 import com.sapo.mock.clothing.customer.dto.response.VoucherResponse;
 import com.sapo.mock.clothing.customer.repository.VoucherRepository;
+import com.sapo.mock.clothing.entity.Notification;
 import com.sapo.mock.clothing.entity.Voucher;
 import com.sapo.mock.clothing.exception.BadRequestException;
 import com.sapo.mock.clothing.exception.ResourceNotFoundException;
+import com.sapo.mock.clothing.notification.service.NotificationService;
 import com.sapo.mock.clothing.util.constant.VoucherCampaignStatusEnum;
+import com.sapo.mock.clothing.util.constant.VoucherDiscountType;
 import com.sapo.mock.clothing.voucher.service.VoucherService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,6 +23,7 @@ import java.util.stream.Collectors;
 public class VoucherServiceImpl implements VoucherService {
 
     private final VoucherRepository voucherRepository;
+    private final NotificationService notificationService;
 
     @Override
     public List<VoucherResponse> getAllVouchers(VoucherCampaignStatusEnum status) {
@@ -40,7 +44,7 @@ public class VoucherServiceImpl implements VoucherService {
         voucher.setName(request.getName());
         voucher.setCode(request.getCode());
         voucher.setDiscountAmount(request.getDiscountAmount());
-        voucher.setDiscountType(request.getDiscountType() != null ? request.getDiscountType() : com.sapo.mock.clothing.util.constant.VoucherDiscountType.FIXED_AMOUNT);
+        voucher.setDiscountType(request.getDiscountType() != null ? request.getDiscountType() : VoucherDiscountType.FIXED_AMOUNT);
         voucher.setMaxDiscountAmount(request.getMaxDiscountAmount());
         voucher.setMinOrderValue(request.getMinOrderValue());
         voucher.setStatus(VoucherCampaignStatusEnum.ACTIVE);
@@ -55,6 +59,19 @@ public class VoucherServiceImpl implements VoucherService {
         voucher.setApplyType(request.getApplyType() != null ? request.getApplyType() : "ALL");
 
         voucher = voucherRepository.save(voucher);
+
+        try {
+            Notification notification = new Notification();
+            notification.setTitle("Mã giảm giá mới");
+            notification.setMessage("Mã khuyến mãi '" + voucher.getCode() + "' vừa được phát hành trên hệ thống.");
+            notification.setType("VOUCHER_CREATED");
+            notification.setTargetRole("ROLE_ADMIN,ROLE_MANAGER,ROLE_CASHIER");
+            notification.setMetadata("{\"voucherId\":" + voucher.getId() + ",\"code\":\"" + voucher.getCode() + "\"}");
+            notificationService.sendNotification(notification);
+        } catch (Exception e) {
+            System.err.println("Lỗi gửi thông báo voucher: " + e.getMessage());
+        }
+
         return VoucherResponse.fromEntity(voucher);
     }
 

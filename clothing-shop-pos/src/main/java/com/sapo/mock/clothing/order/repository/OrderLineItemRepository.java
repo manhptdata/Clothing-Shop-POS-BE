@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import org.springframework.data.domain.Pageable;
+
 import java.time.Instant;
 import java.util.List;
 
@@ -47,4 +49,18 @@ public interface OrderLineItemRepository extends JpaRepository<OrderLineItem, In
             GROUP BY oli.productSku
             """)
     List<Object[]> getVariantSoldQuantitySinceBySku(@Param("cutoffDate") Instant cutoffDate);
+
+    /**
+     * Lấy Top sản phẩm bán chạy nhất trong khoảng thời gian
+     */
+    @Query("""
+            SELECT oli.productName, oli.productSku, SUM(oli.quantity), SUM(oli.subtotal)
+            FROM OrderLineItem oli
+            JOIN oli.order o
+            WHERE o.createdAt BETWEEN :start AND :end
+              AND o.status IN (com.sapo.mock.clothing.util.constant.OrderStatus.COMPLETED, com.sapo.mock.clothing.util.constant.OrderStatus.PARTIALLY_RETURNED)
+            GROUP BY oli.productName, oli.productSku
+            ORDER BY SUM(oli.quantity) DESC
+            """)
+    List<Object[]> findTopProductsBetween(@Param("start") Instant start, @Param("end") Instant end, Pageable pageable);
 }

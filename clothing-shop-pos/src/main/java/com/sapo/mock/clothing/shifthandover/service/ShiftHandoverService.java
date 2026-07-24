@@ -147,11 +147,11 @@ public class ShiftHandoverService {
 
         ShiftHandover saved = shiftHandoverRepository.save(activeShift);
 
-        // Gửi thông báo đến Admin
+        // Gửi thông báo đến Admin và Manager
         Notification notification = new Notification();
-        notification.setTitle("Bàn giao ca / Biến động két");
+        notification.setTitle(discrepancy.compareTo(BigDecimal.ZERO) != 0 ? "⚠️ Bàn giao ca (Lệch quỹ)" : "Bàn giao ca / Biến động két");
         notification.setType("SHIFT_HANDOVER");
-        notification.setTargetRole("ROLE_ADMIN");
+        notification.setTargetRole("ROLE_ADMIN,ROLE_MANAGER");
 
         String diffText;
         if (discrepancy.compareTo(BigDecimal.ZERO) > 0) {
